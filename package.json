@@ -1,0 +1,70 @@
+{
+  "name": "@eesi/sdk",
+  "version": "0.3.0",
+  "description": "EESI for TypeScript: characters you can talk to in real time on Nur Live (voice, tools, live context, memory, multiplayer), and a typed client for the EESI API",
+  "license": "BSD-2-Clause",
+  "author": "Zansat Technologies Private Limited",
+  "homepage": "https://docs.eesi.ai/realtime/characters",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/eesi-ai/eesi-sdk-typescript.git"
+  },
+  "bugs": {
+    "url": "https://github.com/eesi-ai/eesi-sdk-typescript/issues"
+  },
+  "keywords": [
+    "eesi",
+    "nur",
+    "voice-ai",
+    "speech-to-speech",
+    "realtime",
+    "voice-agent",
+    "npc",
+    "game",
+    "companion",
+    "sdk",
+    "api"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./browser": {
+      "types": "./dist/browser/index.d.ts",
+      "import": "./dist/browser/index.js"
+    },
+    "./node": {
+      "types": "./dist/node/index.d.ts",
+      "import": "./dist/node/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "tsc && tsc -p tsconfig.check.json && node --test --test-reporter=spec tests/sdk.test.mts tests/nur.test.mts",
+    "prepare": "tsc"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "openapi-typescript": "^7.13.0",
+    "typescript": "^5.3.0"
+  }
+}

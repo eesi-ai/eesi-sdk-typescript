@@ -1,0 +1,358 @@
+// What happens in a session, as typed events.
+//
+// Every event has a `type` ("transcript.final", "tool.completed") and `at`,
+// the seconds since the session started. Subscribe with a callback, wait for
+// one, or iterate:
+//
+//     session.on("transcript.final", (event) => console.log(event.playerId, event.text));
+//     const reply = await session.wait("response.completed");
+//     for await (const event of session.stream()) { … }
+//
+// Callbacks may be async; a slow one never holds up the audio, and one that
+// throws is logged and the session goes on. `on("tool.*")` matches every
+// tool event, `on("*")` every event. Audio chunks reach callbacks that ask
+// for them by name, and reach `stream()` only with `{ includeAudio: true }`.
+
+import type { MemoryRecord } from "./memory/records.js";
+
+export interface EventBase {
+    /** Seconds since the session started. */
+    at: number;
+    sessionId: string | null;
+    playerId: string | null;
+}
+
+/** One person's part of a transcript several voices share. */
+export interface SpeakerTurn {
+    text: string;
+    /** `Speaker N` as the transcript tagged it; null when there was one voice. */
+    speaker: number | null;
+    /** The player the SDK attributes it to, when it knows. */
+    playerId: string | null;
+}
+
+export interface SessionStarted extends EventBase {
+    type: "session.started";
+    model: string;
+    /** Whether this session continues an earlier one. */
+    resumed: boolean;
+    /** Whether the organization records this session; show `disclosure` to people when it does. */
+    recorded: boolean;
+    disclosure: string | null;
+}
+
+export interface SessionEnded extends EventBase {
+    type: "session.ended";
+    /** `closed`, `hangup`, `limit`, `ended`, `connection_lost` or `server_closed`. */
+    reason: string;
+    code: number | null;
+    message: string | null;
+}
+
+export interface AudioInputStarted extends EventBase {
+    type: "audio.input.started";
+    /** The character was speaking at the time. */
+    whileSpeaking: boolean;
+    /** Where the speech starts in the audio sent so far, in ms, when the server says. */
+    audioStartMs: number | null;
+}
+
+export interface AudioInputEnded extends EventBase {
+    type: "audio.input.ended";
+    audioEndMs: number | null;
+}
+
+export interface TranscriptPartial extends EventBase {
+    type: "transcript.partial";
+    /** What the player is saying so far. Each one replaces the last. */
+    text: string;
+    itemId: string | null;
+}
+
+export interface TranscriptFinal extends EventBase {
+    type: "transcript.final";
+    text: string;
+    itemId: string | null;
+    turns: SpeakerTurn[];
+}
+
+export interface ResponseStarted extends EventBase {
+    type: "response.started";
+    responseId: string;
+}
+
+export interface ResponseTextDelta extends EventBase {
+    type: "response.text.delta";
+    responseId: string;
+    text: string;
+}
+
+export interface ResponseCompleted extends EventBase {
+    type: "response.completed";
+    responseId: string;
+    text: string;
+    /** Seconds from the end of the player's turn to the first audio of this reply, when measured. */
+    latency: number | null;
+}
+
+export interface ResponseCancelled extends EventBase {
+    type: "response.cancelled";
+    responseId: string;
+    reason: string | null;
+    /** What was generated before the cut; the player may have heard less. */
+    text: string;
+}
+
+export interface AudioOutputChunk extends EventBase {
+    type: "audio.output.chunk";
+    responseId: string;
+    /** 16-bit little-endian mono PCM. */
+    pcm: Uint8Array;
+    sampleRate: number;
+}
+
+export interface SpeechInterrupted extends EventBase {
+    type: "speech.interrupted";
+    responseId: string | null;
+}
+
+export interface MemoryRetrieved extends EventBase {
+    type: "memory.retrieved";
+    query: string | null;
+    records: MemoryRecord[];
+}
+
+export interface MemoryUpdated extends EventBase {
+    type: "memory.updated";
+    added: MemoryRecord[];
+    updated: MemoryRecord[];
+    removed: string[];
+    /** `app`, `player`, `extraction` or `correction`. */
+    source: string;
+}
+
+export interface ContextUpdated extends EventBase {
+    type: "context.updated";
+    block: string;
+    /** The block's text as the model now reads it; empty when removed. */
+    text: string;
+}
+
+export interface ToolStarted extends EventBase {
+    type: "tool.started";
+    callId: string;
+    name: string;
+    arguments: Record<string, unknown>;
+}
+
+export interface ToolCompleted extends EventBase {
+    type: "tool.completed";
+    callId: string;
+    name: string;
+    arguments: Record<string, unknown>;
+    /** What the function returned. */
+    result: unknown;
+    /** What the character was told. */
+    output: string;
+    duration: number;
+}
+
+export interface ToolFailed extends EventBase {
+    type: "tool.failed";
+    callId: string;
+    name: string;
+    arguments: Record<string, unknown>;
+    /** `exception`, `invalid_arguments`, `unknown_tool`, `not_allowed`, `not_confirmed` or `timeout`. */
+    reason: string;
+    error: string;
+}
+
+export interface ErrorEvent extends EventBase {
+    type: "error";
+    message: string;
+    code: string | null;
+}
+
+export interface Reconnecting extends EventBase {
+    type: "reconnecting";
+    attempt: number;
+    delay: number;
+    code: number | null;
+}
+
+export interface Reconnected extends EventBase {
+    type: "reconnected";
+    /** Whether the conversation was resumed; false means a fresh one began. */
+    resumed: boolean;
+}
+
+export interface Hangup extends EventBase {
+    type: "session.hangup";
+    reason: string;
+}
+
+export interface Feedback extends EventBase {
+    type: "feedback";
+    rating: number | string;
+    note: string | null;
+    responseId: string | null;
+}
+
+export type NurEvent =
+    | SessionStarted
+    | SessionEnded
+    | AudioInputStarted
+    | AudioInputEnded
+    | TranscriptPartial
+    | TranscriptFinal
+    | ResponseStarted
+    | ResponseTextDelta
+    | ResponseCompleted
+    | ResponseCancelled
+    | AudioOutputChunk
+    | SpeechInterrupted
+    | MemoryRetrieved
+    | MemoryUpdated
+    | ContextUpdated
+    | ToolStarted
+    | ToolCompleted
+    | ToolFailed
+    | ErrorEvent
+    | Reconnecting
+    | Reconnected
+    | Hangup
+    | Feedback;
+
+export type NurEventType = NurEvent["type"];
+/** An exact event type, a family (`"tool.*"`) or everything (`"*"`). */
+export type EventPattern = NurEventType | "*" | `${string}.*`;
+export type EventOf<T extends string> = T extends NurEventType ? Extract<NurEvent, { type: T }> : NurEvent;
+export type Handler<T extends string = string> = (event: EventOf<T>) => unknown;
+
+/** Event fields without the stamp the session adds. */
+export type EventInit<E extends NurEvent> = Omit<E, keyof EventBase>;
+/** Any one event's fields, without the stamp (which it may still override). */
+export type AnyEventInit = NurEvent extends infer E ? (E extends NurEvent ? Omit<E, keyof EventBase> & Partial<EventBase> : never) : never;
+
+export interface Logger {
+    debug?(message: string, ...rest: unknown[]): void;
+    warn(message: string, ...rest: unknown[]): void;
+    error(message: string, ...rest: unknown[]): void;
+}
+
+function matches(pattern: string, type: string): boolean {
+    if (pattern === "*") return true;
+    if (pattern.endsWith(".*")) return type.startsWith(pattern.slice(0, -1));
+    return pattern === type;
+}
+
+interface Stream {
+    queue: NurEvent[];
+    wake: (() => void) | null;
+    includeAudio: boolean;
+    closed: boolean;
+}
+
+/** Fan-out of events to callbacks, waiters and async iterators. */
+export class EventBus {
+    private handlers: Array<{ pattern: string; handler: Handler }> = [];
+    private streams = new Set<Stream>();
+
+    constructor(
+        private readonly logger: Logger = console,
+        private readonly parent: EventBus | null = null,
+    ) {}
+
+    /** Call `handler` for events matching `pattern`. Returns a function that unsubscribes. */
+    on<T extends EventPattern>(pattern: T, handler: Handler<T>): () => void {
+        const entry = { pattern, handler: handler as unknown as Handler };
+        this.handlers.push(entry);
+        return () => {
+            this.handlers = this.handlers.filter((item) => item !== entry);
+        };
+    }
+
+    off(handler: Handler): void {
+        this.handlers = this.handlers.filter((item) => item.handler !== handler);
+    }
+
+    /** Deliver an event now. Never throws; never waits on a handler. */
+    emit(event: NurEvent): void {
+        for (const { pattern, handler } of [...this.handlers]) {
+            if (pattern === "*" && event.type === "audio.output.chunk") continue;
+            if (!matches(pattern, event.type)) continue;
+            try {
+                const result = handler(event);
+                if (result && typeof (result as Promise<unknown>).then === "function") {
+                    (result as Promise<unknown>).catch((error) =>
+                        this.logger.error(`event handler for ${event.type} failed`, error),
+                    );
+                }
+            } catch (error) {
+                this.logger.error(`event handler for ${event.type} failed`, error);
+            }
+        }
+        for (const stream of this.streams) {
+            if (event.type === "audio.output.chunk" && !stream.includeAudio) continue;
+            if (stream.queue.length >= 1000) {
+                this.logger.warn(`event stream is full; dropped ${event.type} (read events faster)`);
+                continue;
+            }
+            stream.queue.push(event);
+            stream.wake?.();
+        }
+        this.parent?.emit(event);
+    }
+
+    /** The next event matching `pattern` (and `predicate`), or a rejection after `timeoutMs`. */
+    wait<T extends EventPattern>(
+        pattern: T,
+        options: { timeoutMs?: number; predicate?: (event: EventOf<T>) => boolean } = {},
+    ): Promise<EventOf<T>> {
+        return new Promise((resolve, reject) => {
+            let timer: ReturnType<typeof setTimeout> | undefined;
+            const unsubscribe = this.on(pattern, (event) => {
+                if (options.predicate && !options.predicate(event)) return;
+                if (timer) clearTimeout(timer);
+                unsubscribe();
+                resolve(event);
+            });
+            if (options.timeoutMs !== undefined) {
+                timer = setTimeout(() => {
+                    unsubscribe();
+                    reject(new Error(`no ${pattern} event within ${options.timeoutMs} ms`));
+                }, options.timeoutMs);
+            }
+        });
+    }
+
+    /** Events from now until `close()`. */
+    async *stream(options: { includeAudio?: boolean } = {}): AsyncIterableIterator<NurEvent> {
+        const stream: Stream = { queue: [], wake: null, includeAudio: options.includeAudio ?? false, closed: false };
+        this.streams.add(stream);
+        try {
+            for (;;) {
+                const next = stream.queue.shift();
+                if (next) {
+                    yield next;
+                    continue;
+                }
+                if (stream.closed) return;
+                await new Promise<void>((wake) => {
+                    stream.wake = wake;
+                });
+                stream.wake = null;
+            }
+        } finally {
+            this.streams.delete(stream);
+        }
+    }
+
+    /** End every `stream()`. */
+    close(): void {
+        for (const stream of this.streams) {
+            stream.closed = true;
+            stream.wake?.();
+        }
+    }
+}
