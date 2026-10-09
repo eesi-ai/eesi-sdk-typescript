@@ -6,9 +6,11 @@ every player, several players at once, any language, and characters that
 speak first. Plus a typed client for the rest of the EESI API.
 
 ```bash
-npm install @eesi/sdk
+npm install github:eesi-ai/eesi-sdk-typescript
 export EESI_API_KEY=sk-eesi-...
 ```
+
+See [Install](#install) for pnpm, yarn, bun, pinning and browsers.
 
 ```ts
 import { NurClient } from "@eesi/sdk";
@@ -28,6 +30,42 @@ await session.close();
 ```
 
 Node 22 or later, Deno, Bun, and every current browser. Nothing else to install.
+
+## Install
+
+```bash
+npm install github:eesi-ai/eesi-sdk-typescript
+```
+
+| With | Command |
+| --- | --- |
+| pnpm | `pnpm add github:eesi-ai/eesi-sdk-typescript` |
+| yarn | `yarn add github:eesi-ai/eesi-sdk-typescript` |
+| bun | `bun add github:eesi-ai/eesi-sdk-typescript` |
+| A fixed version | add `#<commit>`: `npm install github:eesi-ai/eesi-sdk-typescript#1a2b3c4` |
+
+It installs as `@eesi/sdk`, ready to import (no build step):
+
+```ts
+import { NurClient, joinSession, tool } from "@eesi/sdk";   // servers, and clients joining with a secret
+import { browserAudio } from "@eesi/sdk/browser";           // the page's microphone and speakers
+import { fileMemory, wavInput, WavRecorder } from "@eesi/sdk/node";   // memory in a file, WAV files, traces
+```
+
+- **Servers** (Node 22+, Deno, Bun): create an API key on the API keys page of
+  the [EESI console](https://platform.eesi.ai), then
+  `export EESI_API_KEY=sk-eesi-...` (or `new NurClient({ apiKey })`).
+- **Browsers and game clients** never get the key: your server mints a client
+  secret and the page calls `joinSession(secret.join)` (see below). Any bundler
+  works (Vite, webpack, esbuild, Next.js); the page needs https or localhost
+  for the microphone.
+- **Older Node or other runtimes** without a global WebSocket: pass
+  `new NurClient({ webSocket: (url) => new WebSocket(url) })` with the `ws` package.
+- **Unity, Unreal, Godot, native apps**: no package needed; open the client
+  secret's URL with any WebSocket and speak the
+  [realtime protocol](https://docs.eesi.ai/realtime/live).
+
+The npm release (`npm install @eesi/sdk`) is on the way; the code is the same.
 
 ## What you get
 
