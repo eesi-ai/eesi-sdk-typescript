@@ -63,6 +63,8 @@ function asJoin(join) {
     }
     return {
         url: join,
+        token: new URL(join).searchParams.get("token") ?? "",
+        callsUrl: "",
         expiresAt: 0,
         character: "Character",
         model: DEFAULT_MODEL,

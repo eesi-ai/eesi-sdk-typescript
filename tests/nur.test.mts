@@ -26,7 +26,8 @@ import {
     validateSchema,
 } from "../dist/index.js";
 import type { JoinInfo, NurEvent, WebSocketLike } from "../dist/index.js";
-import { FileMemoryStore, fileMemory, readWav, wavBytes } from "../dist/node/index.js";
+import { createHmac } from "node:crypto";
+import { FileMemoryStore, fileMemory, readWav, verifyWebhook, WebhookVerificationError, wavBytes } from "../dist/node/index.js";
 
 // ── a gateway stand-in ───────────────────────────────────────────────────
 
@@ -536,6 +537,33 @@ describe("multiplayer", () => {
         assert.doesNotMatch(JSON.stringify(secret.join), /sk-test|ctl_/);
     });
 
+    it("puts a studio's limits, webhook, tags and data use on the ticket", async () => {
+        const gateway = new FakeGateway();
+        const guard = nurFor(gateway).npc({ name: "Guard" });
+        const secret = await guard.clientSecret({
+            playerId: "p-123",
+            lock: "all",
+            maxDurationSeconds: 600,
+            silenceHangupSeconds: 45,
+            webhook: { url: "https://hooks.neotopia.example/nur", secret: "s".repeat(32) },
+            metadata: { npc: "guard-7" },
+            train: false,
+            record: false,
+        });
+        const body = gateway.secrets[0] as Frame;
+        assert.deepEqual(body.eesi_limits, { max_duration_seconds: 600, silence_hangup_seconds: 45 });
+        assert.deepEqual(body.eesi_webhook, { url: "https://hooks.neotopia.example/nur", secret: "s".repeat(32) });
+        assert.deepEqual(body.eesi_metadata, { npc: "guard-7" });
+        assert.deepEqual(body.eesi_data, { train: false, record: false });
+        assert.equal(secret.join.token, "rt_secret_1");
+        assert.equal(secret.join.callsUrl, "http://gateway.test/v1/realtime/calls");
+        assert.doesNotMatch(JSON.stringify(secret.join), /s{32}/);
+
+        await guard.clientSecret({ playerId: "p-1" });
+        const plain = gateway.secrets[1] as Frame;
+        assert.deepEqual(Object.keys(plain).filter((key) => key.startsWith("eesi_") && key !== "eesi_context"), []);
+    });
+
     it("steers a client's session from the server over the control channel", async () => {
         const gateway = new FakeGateway();
         const kael = nurFor(gateway).npc({ name: "Kael", tools: [openGate] });
@@ -571,6 +599,8 @@ describe("multiplayer", () => {
         gateway.bound = true;
         const join: JoinInfo = {
             url: "ws://gateway.test/v1/realtime?model=nur-live-v1&source=sdk-client&token=rt_secret_1",
+            token: "rt_secret_1",
+            callsUrl: "http://gateway.test/v1/realtime/calls",
             expiresAt: Date.now() / 1000 + 60,
             character: "Kael",
             model: "nur-live-v1",
@@ -662,6 +692,17 @@ describe("pieces", () => {
         const read = readWav(path);
         assert.equal(read.sampleRate, 16_000);
         assert.deepEqual(Buffer.from(read.pcm), Buffer.from(pcm));
+    });
+
+    it("verifies a webhook's signature and age", () => {
+        const body = JSON.stringify({ id: "whk_1", type: "response.completed" });
+        const signature = createHmac("sha256", "s".repeat(32)).update(`whk_1.1760000000.${body}`).digest("hex");
+        const headers = { "eesi-webhook-id": "whk_1", "eesi-webhook-timestamp": "1760000000", "eesi-signature": `v1=${signature}` };
+
+        assert.equal(verifyWebhook(body, headers, "s".repeat(32), { now: 1760000030 }).type, "response.completed");
+        assert.throws(() => verifyWebhook(`${body} `, headers, "s".repeat(32), { now: 1760000030 }), WebhookVerificationError);
+        assert.throws(() => verifyWebhook(body, headers, "t".repeat(32), { now: 1760000030 }), WebhookVerificationError);
+        assert.throws(() => verifyWebhook(body, headers, "s".repeat(32), { now: 1760001000 }), /too old/);
     });
 
     it("keeps the API key out of web pages", () => {

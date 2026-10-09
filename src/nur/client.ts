@@ -104,6 +104,18 @@ export interface ClientSecretOptions {
      * calls are then your server's (`true` or `"server"`); `"client"` leaves them to the client.
      */
     control?: boolean | "server" | "client";
+    /** The longest the call may last, in seconds. It ends with `eesi.hangup` (reason `max_duration`). */
+    maxDurationSeconds?: number;
+    /** Hang up after this many seconds with nobody speaking, typing or being answered (`eesi.hangup`, reason `silence`). */
+    silenceHangupSeconds?: number;
+    /** Post each reply and the session's end to your server, signed with `secret` (check it with `verifyWebhook` from `@eesi/sdk/node`). */
+    webhook?: { url: string; secret: string };
+    /** Your own tags (up to 16), echoed in every webhook post. */
+    metadata?: Record<string, string>;
+    /** false: the session is never used to train, evaluate or improve any model. Default true. */
+    train?: boolean;
+    /** false: no recording or transcript is kept after the session. Default true. */
+    record?: boolean;
 }
 
 /**
@@ -114,6 +126,10 @@ export interface ClientSecretOptions {
 export interface JoinInfo {
     /** The WebSocket URL to open, as it is. It works once, until `expiresAt`. */
     url: string;
+    /** The same one-use secret, for a WebRTC client: POST the SDP offer to `callsUrl` with `Authorization: Bearer <token>`. */
+    token: string;
+    /** Where a WebRTC client posts its offer. */
+    callsUrl: string;
     /** Seconds since the epoch. */
     expiresAt: number;
     character: string;
@@ -436,6 +452,13 @@ export class NurClient {
         };
         if (options.lock !== undefined) body.eesi_lock = options.lock;
         if (control) body.eesi_control = { tools: control };
+        const limits: Record<string, number> = {};
+        if (options.maxDurationSeconds !== undefined) limits.max_duration_seconds = Math.round(options.maxDurationSeconds);
+        if (options.silenceHangupSeconds !== undefined) limits.silence_hangup_seconds = Math.round(options.silenceHangupSeconds);
+        if (Object.keys(limits).length) body.eesi_limits = limits;
+        if (options.webhook) body.eesi_webhook = { url: options.webhook.url, secret: options.webhook.secret };
+        if (options.metadata && Object.keys(options.metadata).length) body.eesi_metadata = options.metadata;
+        if (options.train === false || options.record === false) body.eesi_data = { train: options.train ?? true, record: options.record ?? true };
         let data: Record<string, unknown>;
         try {
             data = (await this.http.call<Record<string, unknown>>("POST", "/realtime/client_secrets", { json: body })) ?? {};
@@ -472,6 +495,8 @@ export class NurClient {
             language: options.language ?? null,
             join: {
                 url,
+                token: value,
+                callsUrl: `${this.baseUrl}/v1/realtime/calls`,
                 expiresAt,
                 character: character.name,
                 model: character.model,

@@ -725,6 +725,24 @@ export interface components {
              */
             tools: "server" | "client";
         };
+        /**
+         * ClientSecretData
+         * @description What the session's audio and words may be used for.
+         *
+         *     Either can only narrow what the organization's own settings allow.
+         */
+        ClientSecretData: {
+            /**
+             * Train
+             * @default true
+             */
+            train: boolean;
+            /**
+             * Record
+             * @default true
+             */
+            record: boolean;
+        };
         /** ClientSecretExpiry */
         ClientSecretExpiry: {
             /**
@@ -738,6 +756,16 @@ export interface components {
              * @default 60
              */
             seconds: number;
+        };
+        /**
+         * ClientSecretLimits
+         * @description How long the session may last; the client cannot change either.
+         */
+        ClientSecretLimits: {
+            /** Max Duration Seconds */
+            max_duration_seconds?: number | null;
+            /** Silence Hangup Seconds */
+            silence_hangup_seconds?: number | null;
         };
         /**
          * ClientSecretRequest
@@ -771,6 +799,19 @@ export interface components {
              * @description What the client may not change: instructions, tools, voice, turn_detection, context, conversation, or all. Defaults to instructions and tools.
              */
             eesi_lock?: ("instructions" | "tools" | "voice" | "turn_detection" | "context" | "conversation")[] | "all" | null;
+            /** @description A maximum call length and a silence hang-up, beyond the client. */
+            eesi_limits?: components["schemas"]["ClientSecretLimits"] | null;
+            /** @description Post each reply and the session's end to your server, signed. */
+            eesi_webhook?: components["schemas"]["ClientSecretWebhook"] | null;
+            /**
+             * Eesi Metadata
+             * @description Your own tags (at most 16), echoed in every webhook.
+             */
+            eesi_metadata?: {
+                [key: string]: string;
+            } | null;
+            /** @description Keep the session out of training, or out of storage. */
+            eesi_data?: components["schemas"]["ClientSecretData"] | null;
         };
         /**
          * ClientSecretResponse
@@ -791,6 +832,35 @@ export interface components {
             eesi_control?: {
                 [key: string]: string;
             } | null;
+            /** Eesi Limits */
+            eesi_limits?: {
+                [key: string]: number;
+            } | null;
+            /** Eesi Webhook */
+            eesi_webhook?: {
+                [key: string]: string;
+            } | null;
+            /** Eesi Metadata */
+            eesi_metadata?: {
+                [key: string]: string;
+            } | null;
+            /** Eesi Data */
+            eesi_data?: {
+                [key: string]: boolean;
+            } | null;
+        };
+        /**
+         * ClientSecretWebhook
+         * @description Post each reply of the session, and its end, to your server, signed.
+         */
+        ClientSecretWebhook: {
+            /**
+             * Url
+             * @description Public https URL.
+             */
+            url: string;
+            /** Secret */
+            secret: string;
         };
         /** CreditLedgerEntryResponse */
         CreditLedgerEntryResponse: {
@@ -1489,9 +1559,12 @@ export type BodyCreateVoiceV1VoicesPost = components['schemas']['Body_create_voi
 export type BodySeparateReferenceClipV1VoicesSeparatePost = components['schemas']['Body_separate_reference_clip_v1_voices_separate_post'];
 export type BundleScorecard = components['schemas']['BundleScorecard'];
 export type ClientSecretControl = components['schemas']['ClientSecretControl'];
+export type ClientSecretData = components['schemas']['ClientSecretData'];
 export type ClientSecretExpiry = components['schemas']['ClientSecretExpiry'];
+export type ClientSecretLimits = components['schemas']['ClientSecretLimits'];
 export type ClientSecretRequest = components['schemas']['ClientSecretRequest'];
 export type ClientSecretResponse = components['schemas']['ClientSecretResponse'];
+export type ClientSecretWebhook = components['schemas']['ClientSecretWebhook'];
 export type CreditLedgerEntryResponse = components['schemas']['CreditLedgerEntryResponse'];
 export type CurrentUsageResponse = components['schemas']['CurrentUsageResponse'];
 export type DailyUsageBreakdownResponse = components['schemas']['DailyUsageBreakdownResponse'];

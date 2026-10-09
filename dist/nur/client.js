@@ -284,6 +284,19 @@ export class NurClient {
             body.eesi_lock = options.lock;
         if (control)
             body.eesi_control = { tools: control };
+        const limits = {};
+        if (options.maxDurationSeconds !== undefined)
+            limits.max_duration_seconds = Math.round(options.maxDurationSeconds);
+        if (options.silenceHangupSeconds !== undefined)
+            limits.silence_hangup_seconds = Math.round(options.silenceHangupSeconds);
+        if (Object.keys(limits).length)
+            body.eesi_limits = limits;
+        if (options.webhook)
+            body.eesi_webhook = { url: options.webhook.url, secret: options.webhook.secret };
+        if (options.metadata && Object.keys(options.metadata).length)
+            body.eesi_metadata = options.metadata;
+        if (options.train === false || options.record === false)
+            body.eesi_data = { train: options.train ?? true, record: options.record ?? true };
         let data;
         try {
             data = (await this.http.call("POST", "/realtime/client_secrets", { json: body })) ?? {};
@@ -319,6 +332,8 @@ export class NurClient {
             language: options.language ?? null,
             join: {
                 url,
+                token: value,
+                callsUrl: `${this.baseUrl}/v1/realtime/calls`,
                 expiresAt,
                 character: character.name,
                 model: character.model,

@@ -63,5 +63,40 @@ export declare class WavRecorder implements AudioOutput {
     close(): void;
     private append;
 }
+/** A webhook post whose signature or age does not check out. */
+export declare class WebhookVerificationError extends Error {
+    constructor(message: string);
+}
+/** One post from a client secret's webhook: a reply, or the session's end. */
+export interface WebhookEvent {
+    id: string;
+    type: "response.completed" | "session.ended" | string;
+    created_at: number;
+    session_id: string;
+    metadata: Record<string, string>;
+    response?: {
+        id: string;
+        status: string;
+        text: string;
+    };
+    reason?: string;
+    duration_seconds?: number;
+}
+/**
+ * Check a webhook post from a client secret's session and return its event.
+ * `body` is the raw request body, exactly as received (not re-serialized
+ * JSON); `headers` the request's headers. Throws `WebhookVerificationError`
+ * when the `EESI-Signature` does not match or the post is older than
+ * `toleranceSeconds` (a replay).
+ *
+ *     app.post("/nur", express.raw({ type: "application/json" }), (req, res) => {
+ *         const event = verifyWebhook(req.body, req.headers, process.env.NUR_WEBHOOK_SECRET!);
+ *         ...
+ *     });
+ */
+export declare function verifyWebhook(body: string | Uint8Array, headers: Record<string, string | string[] | undefined> | Headers, secret: string, options?: {
+    toleranceSeconds?: number;
+    now?: number;
+}): WebhookEvent;
 export { INPUT_SAMPLE_RATE };
 //# sourceMappingURL=index.d.ts.map

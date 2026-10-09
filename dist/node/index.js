@@ -10,6 +10,7 @@
 //         audio: { input: wavInput("./question.wav"), output: new WavRecorder("./answer.wav") },
 //         trace: fileTrace("./traces/kael.jsonl"),
 //     }).start();
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { createWriteStream, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, extname, join } from "node:path";
 import { PlayoutClock, pcmToSamples, samplesToPcm } from "../nur/audio.js";
@@ -269,6 +270,55 @@ export class WavRecorder {
         this.chunks.push(samples);
         this.length += samples.length;
     }
+}
+// ── webhooks ─────────────────────────────────────────────────────────────
+/** A webhook post whose signature or age does not check out. */
+export class WebhookVerificationError extends Error {
+    constructor(message) {
+        super(message);
+        this.name = "WebhookVerificationError";
+    }
+}
+/**
+ * Check a webhook post from a client secret's session and return its event.
+ * `body` is the raw request body, exactly as received (not re-serialized
+ * JSON); `headers` the request's headers. Throws `WebhookVerificationError`
+ * when the `EESI-Signature` does not match or the post is older than
+ * `toleranceSeconds` (a replay).
+ *
+ *     app.post("/nur", express.raw({ type: "application/json" }), (req, res) => {
+ *         const event = verifyWebhook(req.body, req.headers, process.env.NUR_WEBHOOK_SECRET!);
+ *         ...
+ *     });
+ */
+export function verifyWebhook(body, headers, secret, options = {}) {
+    const header = (name) => {
+        if (typeof headers.get === "function")
+            return headers.get(name) ?? "";
+        const found = Object.entries(headers).find(([key]) => key.toLowerCase() === name.toLowerCase())?.[1];
+        return Array.isArray(found) ? (found[0] ?? "") : (found ?? "");
+    };
+    const raw = typeof body === "string" ? Buffer.from(body) : Buffer.from(body.buffer, body.byteOffset, body.byteLength);
+    const id = header("eesi-webhook-id");
+    const timestamp = Number(header("eesi-webhook-timestamp"));
+    if (!Number.isInteger(timestamp))
+        throw new WebhookVerificationError("The webhook has no valid timestamp.");
+    const now = options.now ?? Date.now() / 1000;
+    if (Math.abs(now - timestamp) > (options.toleranceSeconds ?? 300))
+        throw new WebhookVerificationError("The webhook is too old (or from the future).");
+    const expected = createHmac("sha256", secret).update(`${id}.${timestamp}.`).update(raw).digest();
+    const given = header("eesi-signature")
+        .split(",")
+        .map((part) => part.trim())
+        .filter((part) => part.startsWith("v1="))
+        .map((part) => Buffer.from(part.slice(3), "hex"));
+    if (!given.some((candidate) => candidate.length === expected.length && timingSafeEqual(candidate, expected))) {
+        throw new WebhookVerificationError("The webhook signature does not match.");
+    }
+    const event = JSON.parse(raw.toString("utf8"));
+    if (event.id !== id)
+        throw new WebhookVerificationError("The webhook body does not match its id.");
+    return event;
 }
 export { INPUT_SAMPLE_RATE };
 //# sourceMappingURL=index.js.map
