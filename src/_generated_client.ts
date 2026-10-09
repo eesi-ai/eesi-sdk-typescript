@@ -20,11 +20,21 @@ import type {
     InteractionFailure,
     InteractionFailureList,
     InteractionFailureUpdate,
+    ListenerBrief,
+    ListenerEvents,
+    ListenerState,
     OrganizationTurnMetricsSummaryResponse,
+    PhoneCall,
+    PhoneCallRequest,
+    PhoneNumber,
+    PhoneNumberConfirmation,
+    PhoneNumberList,
+    PhoneNumberRequest,
     ScorecardResponse,
     SeparatedClip,
     SpeechModelsResponse,
     SpeechRequest,
+    TextRequest,
     UsageBreakdownResponse,
     UsageHistoryResponse,
     VoiceIsolation,
@@ -44,11 +54,23 @@ import type {
  */
 export type SendableBody<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
 
+/** The body `confirmPhoneNumber` takes. */
+export type ConfirmPhoneNumberBody = PhoneNumberConfirmation;
+
+/** The body `createPhoneCall` takes. */
+export type CreatePhoneCallBody = PhoneCallRequest;
+
 /** The body `createRealtimeClientSecret` takes. */
 export type CreateRealtimeClientSecretBody = ClientSecretRequest;
 
 /** The body `createSpeech` takes. */
 export type CreateSpeechBody = SendableBody<SpeechRequest, "response_format" | "speed" | "stream_format" | "normalize_text">;
+
+/** The body `publishPhoneListener` takes. */
+export type PublishPhoneListenerBody = ListenerBrief;
+
+/** The body `sendText` takes. */
+export type SendTextBody = TextRequest;
 
 /** The body `setVoiceIsolation` takes. */
 export type SetVoiceIsolationBody = VoiceIsolationRequest;
@@ -58,6 +80,9 @@ export type UpdateFailureBody = InteractionFailureUpdate;
 
 /** The body `updateVoice` takes. */
 export type UpdateVoiceBody = VoiceUpdateRequest;
+
+/** The body `verifyPhoneNumber` takes. */
+export type VerifyPhoneNumberBody = PhoneNumberRequest;
 
 export abstract class _GeneratedClient {
     protected abstract request<T = unknown>(
@@ -79,6 +104,16 @@ export abstract class _GeneratedClient {
     /** Chat completions. `body` is an OpenAI chat-completions request and is forwarded verbatim; the parsed completion is returned. Streaming (`stream: true`) is not supported by this method — use an OpenAI client for that. */
     async chatCompletions(opts: { body: Record<string, unknown> }): Promise<unknown> {
         return this.request("POST", "/chat/completions", { json: opts.body });
+    }
+
+    /** Enter the code Nur phoned in; the number is confirmed for its calls. */
+    async confirmPhoneNumber(opts: { body: PhoneNumberConfirmation }): Promise<PhoneNumber> {
+        return this.request<PhoneNumber>("POST", "/phone/numbers/confirm", { json: opts.body });
+    }
+
+    /** Have Nur call a phone number: say what the call is about, and Nur has the conversation. Fetch the call afterwards for its transcript. */
+    async createPhoneCall(opts: { body: PhoneCallRequest }): Promise<unknown> {
+        return this.request("POST", "/phone/calls", { json: opts.body });
     }
 
     /** Mint a one-use credential that opens a realtime session already configured as you specify, for a client that must not hold your key. */
@@ -125,6 +160,11 @@ export abstract class _GeneratedClient {
     /** Delete a cloned voice. */
     async deleteVoice(voiceId: string): Promise<VoiceResponse> {
         return this.request<VoiceResponse>("DELETE", `/voices/${voiceId}`);
+    }
+
+    /** Stop Nur's calls to a number on the shared line until it is confirmed again. */
+    async forgetPhoneNumber(number: string): Promise<unknown> {
+        return this.request("DELETE", `/phone/numbers/${number}`);
     }
 
     /** Get all API keys for the user's selected organization. */
@@ -176,6 +216,11 @@ export abstract class _GeneratedClient {
             ...(opts.days !== undefined ? { "days": opts.days } : {}),
         };
         return this.request<OrganizationTurnMetricsSummaryResponse>("GET", "/organizations/turn-metrics/summary", { params });
+    }
+
+    /** A call Nur placed: its status, and once it has ended, its transcript. */
+    async getPhoneCall(callId: string): Promise<PhoneCall> {
+        return this.request<PhoneCall>("GET", `/phone/calls/${callId}`);
     }
 
     /** Get usage cost broken down by kind, model and API key for the organization. */
@@ -231,6 +276,11 @@ export abstract class _GeneratedClient {
         return this.request<GenerationListResponse>("GET", "/generations", { params });
     }
 
+    /** The numbers confirmed for Nur's calls on the shared EESI line. */
+    async listPhoneNumbers(): Promise<PhoneNumberList> {
+        return this.request<PhoneNumberList>("GET", "/phone/numbers");
+    }
+
     /** List speech models. */
     async listSpeechModels(): Promise<SpeechModelsResponse> {
         return this.request<SpeechModelsResponse>("GET", "/audio/models");
@@ -239,6 +289,24 @@ export abstract class _GeneratedClient {
     /** List the organization's cloned voices. */
     async listVoices(): Promise<VoicesListResponse> {
         return this.request<VoicesListResponse>("GET", "/voices");
+    }
+
+    /** Calls to the code line that have ended, and texts to it, since you last asked; waits up to `wait` seconds for one. */
+    async phoneListenerEvents(opts: { wait?: number } = {}): Promise<ListenerEvents> {
+        const params: Record<string, unknown> = {
+            ...(opts.wait !== undefined ? { "wait": opts.wait } : {}),
+        };
+        return this.request<ListenerEvents>("GET", "/phone/listener/events", { params });
+    }
+
+    /** Brief the code line: what a call about your code should know. Publish again before it expires; calls to the code line use the latest. */
+    async publishPhoneListener(opts: { body: ListenerBrief }): Promise<ListenerState> {
+        return this.request<ListenerState>("PUT", "/phone/listener", { json: opts.body });
+    }
+
+    /** Text a number. On the shared EESI line: a confirmed number, from the code line, so a reply reaches Nur. */
+    async sendText(opts: { body: TextRequest }): Promise<unknown> {
+        return this.request("POST", "/phone/messages", { json: opts.body });
     }
 
     /** Separate a voice from what was recorded around it, without storing either. */
@@ -261,6 +329,11 @@ export abstract class _GeneratedClient {
     /** Rename a cloned voice. */
     async updateVoice(voiceId: string, opts: { body: VoiceUpdateRequest }): Promise<VoiceResponse> {
         return this.request<VoiceResponse>("PATCH", `/voices/${voiceId}`, { json: opts.body });
+    }
+
+    /** Have Nur phone a number a six-digit code; entering it confirms the number for calls on the shared EESI line. */
+    async verifyPhoneNumber(opts: { body: PhoneNumberRequest }): Promise<PhoneNumber> {
+        return this.request<PhoneNumber>("POST", "/phone/numbers", { json: opts.body });
     }
 
     /** The serving backend's accepted voice-design vocabulary. */

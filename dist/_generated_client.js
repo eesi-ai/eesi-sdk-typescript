@@ -17,6 +17,14 @@ export class _GeneratedClient {
     async chatCompletions(opts) {
         return this.request("POST", "/chat/completions", { json: opts.body });
     }
+    /** Enter the code Nur phoned in; the number is confirmed for its calls. */
+    async confirmPhoneNumber(opts) {
+        return this.request("POST", "/phone/numbers/confirm", { json: opts.body });
+    }
+    /** Have Nur call a phone number: say what the call is about, and Nur has the conversation. Fetch the call afterwards for its transcript. */
+    async createPhoneCall(opts) {
+        return this.request("POST", "/phone/calls", { json: opts.body });
+    }
     /** Mint a one-use credential that opens a realtime session already configured as you specify, for a client that must not hold your key. */
     async createRealtimeClientSecret(opts) {
         return this.request("POST", "/realtime/client_secrets", { json: opts.body });
@@ -74,6 +82,10 @@ export class _GeneratedClient {
     async deleteVoice(voiceId) {
         return this.request("DELETE", `/voices/${voiceId}`);
     }
+    /** Stop Nur's calls to a number on the shared line until it is confirmed again. */
+    async forgetPhoneNumber(number) {
+        return this.request("DELETE", `/phone/numbers/${number}`);
+    }
     /** Get all API keys for the user's selected organization. */
     async getApiKeys(opts = {}) {
         const params = {
@@ -117,6 +129,10 @@ export class _GeneratedClient {
             ...(opts.days !== undefined ? { "days": opts.days } : {}),
         };
         return this.request("GET", "/organizations/turn-metrics/summary", { params });
+    }
+    /** A call Nur placed: its status, and once it has ended, its transcript. */
+    async getPhoneCall(callId) {
+        return this.request("GET", `/phone/calls/${callId}`);
     }
     /** Get usage cost broken down by kind, model and API key for the organization. */
     async getUsageBreakdown(opts = {}) {
@@ -165,6 +181,10 @@ export class _GeneratedClient {
         };
         return this.request("GET", "/generations", { params });
     }
+    /** The numbers confirmed for Nur's calls on the shared EESI line. */
+    async listPhoneNumbers() {
+        return this.request("GET", "/phone/numbers");
+    }
     /** List speech models. */
     async listSpeechModels() {
         return this.request("GET", "/audio/models");
@@ -172,6 +192,21 @@ export class _GeneratedClient {
     /** List the organization's cloned voices. */
     async listVoices() {
         return this.request("GET", "/voices");
+    }
+    /** Calls to the code line that have ended, and texts to it, since you last asked; waits up to `wait` seconds for one. */
+    async phoneListenerEvents(opts = {}) {
+        const params = {
+            ...(opts.wait !== undefined ? { "wait": opts.wait } : {}),
+        };
+        return this.request("GET", "/phone/listener/events", { params });
+    }
+    /** Brief the code line: what a call about your code should know. Publish again before it expires; calls to the code line use the latest. */
+    async publishPhoneListener(opts) {
+        return this.request("PUT", "/phone/listener", { json: opts.body });
+    }
+    /** Text a number. On the shared EESI line: a confirmed number, from the code line, so a reply reaches Nur. */
+    async sendText(opts) {
+        return this.request("POST", "/phone/messages", { json: opts.body });
     }
     /** Separate a voice from what was recorded around it, without storing either. */
     async separateReferenceClip(opts) {
@@ -190,6 +225,10 @@ export class _GeneratedClient {
     /** Rename a cloned voice. */
     async updateVoice(voiceId, opts) {
         return this.request("PATCH", `/voices/${voiceId}`, { json: opts.body });
+    }
+    /** Have Nur phone a number a six-digit code; entering it confirms the number for calls on the shared EESI line. */
+    async verifyPhoneNumber(opts) {
+        return this.request("POST", "/phone/numbers", { json: opts.body });
     }
     /** The serving backend's accepted voice-design vocabulary. */
     async voiceDesignOptions() {

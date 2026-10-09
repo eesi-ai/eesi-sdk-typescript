@@ -5,6 +5,15 @@ All notable changes to `@eesi/sdk` for TypeScript. The format follows
 follows [Semantic Versioning](https://semver.org/). Before 1.0, a minor version
 may change public APIs; such changes are listed under **Changed**.
 
+## 0.4.0
+
+### Added
+
+- REST: phone calls Nur places (`createPhoneCall`, `getPhoneCall`), confirmed
+  numbers (`verifyPhoneNumber`, `confirmPhoneNumber`, `listPhoneNumbers`,
+  `forgetPhoneNumber`), texts (`sendText`) and the code line's listener
+  (`publishPhoneListener`, `phoneListenerEvents`), in the generated client.
+
 ## 0.3.0
 
 ### Added

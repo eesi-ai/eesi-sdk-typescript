@@ -487,6 +487,149 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/phone/calls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Phone Call
+         * @description Dial ``to`` and let Nur hold the conversation the instructions describe.
+         */
+        post: operations["create_phone_call_v1_phone_calls_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/phone/calls/{call_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Phone Call */
+        get: operations["get_phone_call_v1_phone_calls__call_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/phone/numbers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Phone Numbers */
+        get: operations["list_phone_numbers_v1_phone_numbers_get"];
+        put?: never;
+        /**
+         * Verify Phone Number
+         * @description Phone *number* a code, unless it is confirmed already.
+         */
+        post: operations["verify_phone_number_v1_phone_numbers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/phone/numbers/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm Phone Number */
+        post: operations["confirm_phone_number_v1_phone_numbers_confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/phone/numbers/{number}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Forget Phone Number */
+        delete: operations["forget_phone_number_v1_phone_numbers__number__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/phone/listener": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Publish Phone Listener */
+        put: operations["publish_phone_listener_v1_phone_listener_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/phone/listener/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Phone Listener Events */
+        get: operations["phone_listener_events_v1_phone_listener_events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/phone/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send Text */
+        post: operations["send_text_v1_phone_messages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1102,6 +1245,50 @@ export interface components {
             /** Count */
             count: number;
         };
+        /**
+         * ListenerBrief
+         * @description What the listener beside the code says a call about it should know.
+         */
+        ListenerBrief: {
+            /** Phone */
+            phone: string;
+            /** Name */
+            name?: string | null;
+            /** Repo */
+            repo?: string | null;
+            /** Instructions */
+            instructions: string;
+            /** Greeting */
+            greeting?: string | null;
+            /** Texting */
+            texting?: string | null;
+        };
+        /** ListenerEvent */
+        ListenerEvent: {
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "call.ended" | "text.received";
+            /** Call Id */
+            call_id?: string | null;
+            /** Text */
+            text?: string | null;
+            /** Reply */
+            reply?: string | null;
+        };
+        /** ListenerEvents */
+        ListenerEvents: {
+            /** Data */
+            data: components["schemas"]["ListenerEvent"][];
+        };
+        /** ListenerState */
+        ListenerState: {
+            /** Expires In */
+            expires_in: number;
+            /** Lines */
+            lines: components["schemas"]["PhoneLine"][];
+        };
         /** OrganizationTurnMetricsSummaryResponse */
         OrganizationTurnMetricsSummaryResponse: {
             /** Days */
@@ -1109,6 +1296,105 @@ export interface components {
             /** Since */
             since?: string | null;
             summary: components["schemas"]["TurnMetricsSummary"];
+        };
+        /**
+         * PhoneCall
+         * @description One call: where it stands, and when it is over, what was said.
+         */
+        PhoneCall: {
+            /** Id */
+            id: string;
+            /** Session Id */
+            session_id: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "dialing" | "in_progress" | "completed" | "not_answered";
+            /** To */
+            to: string;
+            /** Created At */
+            created_at: number;
+            /** Duration Seconds */
+            duration_seconds?: number | null;
+            /** Transcript */
+            transcript?: components["schemas"]["PhoneCallTurn"][] | null;
+            /** Metadata */
+            metadata?: {
+                [key: string]: string;
+            } | null;
+        };
+        /**
+         * PhoneCallRequest
+         * @description Who Nur calls, and what the call is about.
+         */
+        PhoneCallRequest: {
+            /** To */
+            to: string;
+            /** Instructions */
+            instructions: string;
+            /** Greeting */
+            greeting?: string | null;
+            /** Voice */
+            voice?: string | null;
+            /** Metadata */
+            metadata?: {
+                [key: string]: string;
+            } | null;
+        };
+        /** PhoneCallTurn */
+        PhoneCallTurn: {
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "person" | "nur";
+            /** Text */
+            text: string;
+        };
+        /** PhoneLine */
+        PhoneLine: {
+            /** Number */
+            number: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "code" | "live";
+        };
+        /**
+         * PhoneNumber
+         * @description A number Nur may call on the shared line, or one whose code is on its way.
+         */
+        PhoneNumber: {
+            /** Number */
+            number: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "confirmed" | "code_sent";
+            /** Confirmed At */
+            confirmed_at?: number | null;
+        };
+        /** PhoneNumberConfirmation */
+        PhoneNumberConfirmation: {
+            /** Number */
+            number: string;
+            /** Code */
+            code: string;
+            /** Name */
+            name?: string | null;
+        };
+        /** PhoneNumberList */
+        PhoneNumberList: {
+            /** Data */
+            data: components["schemas"]["PhoneNumber"][];
+        };
+        /** PhoneNumberRequest */
+        PhoneNumberRequest: {
+            /** Number */
+            number: string;
         };
         /**
          * RealtimeSessionUsageResponse
@@ -1154,6 +1440,15 @@ export interface components {
             since: string;
             /** Bundles */
             bundles: components["schemas"]["BundleScorecard"][];
+        };
+        /** SentText */
+        SentText: {
+            /** Id */
+            id?: string | null;
+            /** To */
+            to: string;
+            /** From Number */
+            from_number: string;
         };
         /**
          * SeparatedClip
@@ -1251,6 +1546,13 @@ export interface components {
             normalize_text: boolean;
             /** Source */
             source?: string | null;
+        };
+        /** TextRequest */
+        TextRequest: {
+            /** To */
+            to: string;
+            /** Text */
+            text: string;
         };
         /**
          * TurnMetricsCoverage
@@ -1577,13 +1879,27 @@ export type InteractionFailure = components['schemas']['InteractionFailure'];
 export type InteractionFailureList = components['schemas']['InteractionFailureList'];
 export type InteractionFailureUpdate = components['schemas']['InteractionFailureUpdate'];
 export type LatencyBucket = components['schemas']['LatencyBucket'];
+export type ListenerBrief = components['schemas']['ListenerBrief'];
+export type ListenerEvent = components['schemas']['ListenerEvent'];
+export type ListenerEvents = components['schemas']['ListenerEvents'];
+export type ListenerState = components['schemas']['ListenerState'];
 export type OrganizationTurnMetricsSummaryResponse = components['schemas']['OrganizationTurnMetricsSummaryResponse'];
+export type PhoneCall = components['schemas']['PhoneCall'];
+export type PhoneCallRequest = components['schemas']['PhoneCallRequest'];
+export type PhoneCallTurn = components['schemas']['PhoneCallTurn'];
+export type PhoneLine = components['schemas']['PhoneLine'];
+export type PhoneNumber = components['schemas']['PhoneNumber'];
+export type PhoneNumberConfirmation = components['schemas']['PhoneNumberConfirmation'];
+export type PhoneNumberList = components['schemas']['PhoneNumberList'];
+export type PhoneNumberRequest = components['schemas']['PhoneNumberRequest'];
 export type RealtimeSessionUsageResponse = components['schemas']['RealtimeSessionUsageResponse'];
 export type ScorecardResponse = components['schemas']['ScorecardResponse'];
+export type SentText = components['schemas']['SentText'];
 export type SeparatedClip = components['schemas']['SeparatedClip'];
 export type SpeechModelInfo = components['schemas']['SpeechModelInfo'];
 export type SpeechModelsResponse = components['schemas']['SpeechModelsResponse'];
 export type SpeechRequest = components['schemas']['SpeechRequest'];
+export type TextRequest = components['schemas']['TextRequest'];
 export type TurnMetricsCoverage = components['schemas']['TurnMetricsCoverage'];
 export type TurnMetricsSummary = components['schemas']['TurnMetricsSummary'];
 export type UsageApiKeyBreakdown = components['schemas']['UsageApiKeyBreakdown'];
@@ -2723,6 +3039,381 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GenerationListResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_phone_call_v1_phone_calls_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PhoneCallRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneCall"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_phone_call_v1_phone_calls__call_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path: {
+                call_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneCall"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_phone_numbers_v1_phone_numbers_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneNumberList"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verify_phone_number_v1_phone_numbers_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PhoneNumberRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneNumber"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_phone_number_v1_phone_numbers_confirm_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PhoneNumberConfirmation"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneNumber"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    forget_phone_number_v1_phone_numbers__number__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path: {
+                number: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    publish_phone_listener_v1_phone_listener_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ListenerBrief"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListenerState"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    phone_listener_events_v1_phone_listener_events_get: {
+        parameters: {
+            query?: {
+                wait?: number;
+            };
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListenerEvents"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_text_v1_phone_messages_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TextRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SentText"];
                 };
             };
             /** @description Not found */
