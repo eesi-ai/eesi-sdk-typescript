@@ -82,7 +82,7 @@ export type UpdateFailureBody = InteractionFailureUpdate;
 export type UpdateVoiceBody = VoiceUpdateRequest;
 
 /** The body `verifyPhoneNumber` takes. */
-export type VerifyPhoneNumberBody = PhoneNumberRequest;
+export type VerifyPhoneNumberBody = SendableBody<PhoneNumberRequest, "channel">;
 
 export abstract class _GeneratedClient {
     protected abstract request<T = unknown>(
@@ -106,7 +106,7 @@ export abstract class _GeneratedClient {
         return this.request("POST", "/chat/completions", { json: opts.body });
     }
 
-    /** Enter the code Nur phoned in; the number is confirmed for its calls. */
+    /** Enter the code sent to the number; it is confirmed for Nur's calls and texts. */
     async confirmPhoneNumber(opts: { body: PhoneNumberConfirmation }): Promise<PhoneNumber> {
         return this.request<PhoneNumber>("POST", "/phone/numbers/confirm", { json: opts.body });
     }
@@ -331,8 +331,8 @@ export abstract class _GeneratedClient {
         return this.request<VoiceResponse>("PATCH", `/voices/${voiceId}`, { json: opts.body });
     }
 
-    /** Have Nur phone a number a six-digit code; entering it confirms the number for calls on the shared EESI line. */
-    async verifyPhoneNumber(opts: { body: PhoneNumberRequest }): Promise<PhoneNumber> {
+    /** Send a number a six-digit code, by text (or a call); entering it confirms the number for Nur's calls and texts on the shared EESI line. */
+    async verifyPhoneNumber(opts: { body: SendableBody<PhoneNumberRequest, "channel"> }): Promise<PhoneNumber> {
         return this.request<PhoneNumber>("POST", "/phone/numbers", { json: opts.body });
     }
 

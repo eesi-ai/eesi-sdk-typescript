@@ -537,7 +537,7 @@ export interface paths {
         put?: never;
         /**
          * Verify Phone Number
-         * @description Phone *number* a code, unless it is confirmed already.
+         * @description Send *number* a code, unless it is confirmed already.
          */
         post: operations["verify_phone_number_v1_phone_numbers_post"];
         delete?: never;
@@ -1377,6 +1377,8 @@ export interface components {
             status: "confirmed" | "code_sent";
             /** Confirmed At */
             confirmed_at?: number | null;
+            /** Channel */
+            channel?: ("text" | "call") | null;
         };
         /** PhoneNumberConfirmation */
         PhoneNumberConfirmation: {
@@ -1396,6 +1398,12 @@ export interface components {
         PhoneNumberRequest: {
             /** Number */
             number: string;
+            /**
+             * Channel
+             * @default text
+             * @enum {string}
+             */
+            channel: "text" | "call";
         };
         /**
          * RealtimeSessionUsageResponse

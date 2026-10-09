@@ -17,7 +17,7 @@ export class _GeneratedClient {
     async chatCompletions(opts) {
         return this.request("POST", "/chat/completions", { json: opts.body });
     }
-    /** Enter the code Nur phoned in; the number is confirmed for its calls. */
+    /** Enter the code sent to the number; it is confirmed for Nur's calls and texts. */
     async confirmPhoneNumber(opts) {
         return this.request("POST", "/phone/numbers/confirm", { json: opts.body });
     }
@@ -226,7 +226,7 @@ export class _GeneratedClient {
     async updateVoice(voiceId, opts) {
         return this.request("PATCH", `/voices/${voiceId}`, { json: opts.body });
     }
-    /** Have Nur phone a number a six-digit code; entering it confirms the number for calls on the shared EESI line. */
+    /** Send a number a six-digit code, by text (or a call); entering it confirms the number for Nur's calls and texts on the shared EESI line. */
     async verifyPhoneNumber(opts) {
         return this.request("POST", "/phone/numbers", { json: opts.body });
     }

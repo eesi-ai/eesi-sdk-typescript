@@ -27,7 +27,7 @@ export type UpdateFailureBody = InteractionFailureUpdate;
 /** The body `updateVoice` takes. */
 export type UpdateVoiceBody = VoiceUpdateRequest;
 /** The body `verifyPhoneNumber` takes. */
-export type VerifyPhoneNumberBody = PhoneNumberRequest;
+export type VerifyPhoneNumberBody = SendableBody<PhoneNumberRequest, "channel">;
 export declare abstract class _GeneratedClient {
     protected abstract request<T = unknown>(method: string, path: string, opts?: {
         json?: unknown;
@@ -41,7 +41,7 @@ export declare abstract class _GeneratedClient {
     chatCompletions(opts: {
         body: Record<string, unknown>;
     }): Promise<unknown>;
-    /** Enter the code Nur phoned in; the number is confirmed for its calls. */
+    /** Enter the code sent to the number; it is confirmed for Nur's calls and texts. */
     confirmPhoneNumber(opts: {
         body: PhoneNumberConfirmation;
     }): Promise<PhoneNumber>;
@@ -178,9 +178,9 @@ export declare abstract class _GeneratedClient {
     updateVoice(voiceId: string, opts: {
         body: VoiceUpdateRequest;
     }): Promise<VoiceResponse>;
-    /** Have Nur phone a number a six-digit code; entering it confirms the number for calls on the shared EESI line. */
+    /** Send a number a six-digit code, by text (or a call); entering it confirms the number for Nur's calls and texts on the shared EESI line. */
     verifyPhoneNumber(opts: {
-        body: PhoneNumberRequest;
+        body: SendableBody<PhoneNumberRequest, "channel">;
     }): Promise<PhoneNumber>;
     /** The serving backend's accepted voice-design vocabulary. */
     voiceDesignOptions(): Promise<unknown>;
