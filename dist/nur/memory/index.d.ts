@@ -23,12 +23,14 @@ export interface MemoryPolicy {
     weights?: RecallWeights;
     /** Your own extraction model; the default asks nur-llm-v1 with your key. */
     extractor?: Extractor;
+    /** What may be remembered, in your words, for the default extractor: "Only game facts... never age, school, location or social accounts." */
+    rules?: string;
 }
 /** A store plus a policy: what you pass as a character's `memory`. */
 export declare class Memory {
     readonly store: MemoryStore;
     readonly namespace: string;
-    readonly policy: Required<Omit<MemoryPolicy, "redact" | "extractor" | "retentionDays">> & Pick<MemoryPolicy, "redact" | "extractor" | "retentionDays">;
+    readonly policy: Required<Omit<MemoryPolicy, "redact" | "extractor" | "retentionDays" | "rules">> & Pick<MemoryPolicy, "redact" | "extractor" | "retentionDays" | "rules">;
     constructor(store?: MemoryStore, policy?: MemoryPolicy, namespace?: string);
 }
 export interface RememberOptions {

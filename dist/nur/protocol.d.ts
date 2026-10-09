@@ -18,6 +18,11 @@ export type ServerEvent = {
 /** One name per server event, whichever protocol version sent it. */
 export declare function canonicalType(kind: string): string;
 export declare function eventId(): string;
+/**
+ * Random bytes for ids (events, items, memories), never for secrets. Web
+ * Crypto where the platform has it; Node 18 does not expose it to modules.
+ */
+export declare function randomBytes(length: number): Uint8Array;
 export declare function randomHex(length: number): string;
 export declare function sessionUpdate(session: Record<string, unknown>): ClientEvent;
 export declare function contextUpdate(key: string, text: string): ClientEvent;

@@ -40,6 +40,7 @@ export class Memory {
             redact: policy.redact,
             extractor: policy.extractor,
             retentionDays: policy.retentionDays,
+            rules: policy.rules,
         };
     }
 }
@@ -232,7 +233,7 @@ export class CharacterMemory {
      * connected with a client secret and sent you its transcript).
      */
     async learn(transcript, options) {
-        const extractor = this.policy.extractor ?? (this.chat ? llmExtractor(this.chat) : null);
+        const extractor = this.policy.extractor ?? (this.chat ? llmExtractor(this.chat, { rules: this.policy.rules }) : null);
         if (!extractor || !transcript.some(([, text]) => text.trim()))
             return { added: [], superseded: [], forgotten: [] };
         const existing = (await this.scope(options.playerId)).filter((record) => record.kind !== "summary").slice(0, 60);

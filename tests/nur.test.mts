@@ -14,6 +14,7 @@ import {
     AuthenticationError,
     formatTrace,
     joinSession,
+    llmExtractor,
     Memory,
     NurClient,
     parseExtraction,
@@ -670,6 +671,54 @@ describe("pieces", () => {
         assert.equal(result.summary, "Met.");
         assert.deepEqual(result.memories, [{ text: "They like tea.", kind: "preference", importance: 0.3, key: "name", replaces: "mem_a" }]);
         assert.deepEqual(result.forget, ["mem_b"]);
+    });
+
+    it("puts a game's own memory rules last in the extraction prompt", async () => {
+        const seen: Array<Array<{ role: string; content: string }>> = [];
+        const chat = async (messages: Array<{ role: string; content: string }>) => {
+            seen.push(messages);
+            return '{"summary": "", "memories": [], "forget": []}';
+        };
+        const request = { characterName: "Sage", playerId: "p1", playerName: null, transcript: [["player", "I'm building a treehouse."]] as Array<[string, string]>, existing: [] };
+        await llmExtractor(chat, { rules: "Only game facts. Never age, school or location." })(request);
+        await llmExtractor(chat)(request);
+        assert.ok(
+            seen[0]?.[0]?.content.endsWith(
+                "\n\nWhat Sage may remember, set by the game, which wins over the rules above where they differ:\nOnly game facts. Never age, school or location.",
+            ),
+        );
+        assert.doesNotMatch(seen[1]?.[0]?.content ?? "", /set by the game/);
+    });
+
+    it("learns a player's memories from a session.ended webhook", async () => {
+        const seen: Array<Array<[string, string]>> = [];
+        const sage = nurFor(new FakeGateway()).npc({
+            name: "Sage",
+            memory: new Memory(undefined, {
+                extractor: async (request) => {
+                    seen.push(request.transcript);
+                    return { summary: "Talked about a treehouse.", memories: [{ text: "They are building a treehouse.", kind: "fact", importance: 0.6, key: null, replaces: null }], forget: [] };
+                },
+            }),
+        });
+        const event = {
+            type: "session.ended",
+            session_id: "conv_1",
+            transcript: [
+                { role: "player", text: "I'm building a treehouse." },
+                { role: "character", text: "Use oak for the floor." },
+            ],
+        };
+
+        const learned = await sage.learnFromSession(event, { playerId: "p-123" });
+
+        assert.deepEqual(seen[0], [
+            ["player", "I'm building a treehouse."],
+            ["Sage", "Use oak for the floor."],
+        ]);
+        assert.deepEqual(new Set(learned.added.map((record) => record.text)), new Set(["They are building a treehouse.", "Talked about a treehouse."]));
+        assert.ok(learned.added.every((record) => record.playerId === "p-123"));
+        assert.deepEqual(await sage.learnFromSession({ type: "response.completed" }, { playerId: "p-123" }), { added: [], superseded: [], forgotten: [] });
     });
 
     it("keeps memory in a JSON file both SDKs read", async () => {

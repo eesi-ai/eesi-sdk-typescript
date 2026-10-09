@@ -29,7 +29,7 @@ console.log((await session.ask("What do you sell?")).text);
 await session.close();
 ```
 
-Node 22 or later, Deno, Bun, and every current browser. Nothing else to install.
+Node 18 or later, Deno, Bun, and every current browser. Nothing else to install.
 
 ## Install
 
@@ -52,15 +52,17 @@ import { browserAudio } from "@eesi/sdk/browser";           // the page's microp
 import { fileMemory, wavInput, WavRecorder } from "@eesi/sdk/node";   // memory in a file, WAV files, traces
 ```
 
-- **Servers** (Node 22+, Deno, Bun): create an API key on the API keys page of
+- **Servers** (Node 18+, Deno, Bun): create an API key on the API keys page of
   the [EESI console](https://platform.eesi.ai), then
   `export EESI_API_KEY=sk-eesi-...` (or `new NurClient({ apiKey })`).
 - **Browsers and game clients** never get the key: your server mints a client
   secret and the page calls `joinSession(secret.join)` (see below). Any bundler
   works (Vite, webpack, esbuild, Next.js); the page needs https or localhost
   for the microphone.
-- **Older Node or other runtimes** without a global WebSocket: pass
-  `new NurClient({ webSocket: (url) => new WebSocket(url) })` with the `ws` package.
+- **Live sessions on your server** (`connect()`, `control()`) use the platform's
+  WebSocket, built into Node 22 and later. On Node 18 or 20 pass
+  `new NurClient({ webSocket: (url) => new WebSocket(url) })` with the `ws`
+  package. Minting client secrets, memory and webhooks need no WebSocket.
 - **Unity, Unreal, Godot, native apps**: no package needed; open the client
   secret's URL with any WebSocket and speak the
   [realtime protocol](https://docs.eesi.ai/realtime/live).
@@ -254,6 +256,28 @@ Memories are learned when a session ends, by EESI's text model with your key
 (pass your own `extractor`, or `extract: false`). Nothing is trained on them.
 A store is anything that implements `MemoryStore`; the JSON export is the same
 in both SDKs.
+
+### Players who connect with a client secret
+
+When the player's device holds the session, your server still keeps its
+memories: `clientSecret({ playerId })` starts the session with them, and the
+`session.ended` webhook (its transcript) is what it learns from.
+
+```ts
+import { verifyWebhook } from "@eesi/sdk/node";
+
+const sage = nur.npc({ name: "Sage", memory: new Memory(myDatabaseStore, { rules: "Only game facts. Never age, school or location." }) });
+const secret = await sage.clientSecret({ playerId, webhook: { url, secret: webhookSecret }, metadata: { player_id: playerId } });
+
+app.post("/nur", express.raw({ type: "application/json" }), async (req, res) => {
+    const event = verifyWebhook(req.body, req.headers, webhookSecret);
+    res.sendStatus(204);
+    if (event.type === "session.ended") await sage.learnFromSession(event, { playerId: event.metadata.player_id });
+});
+```
+
+`rules` say what may be remembered, in your words; `sage.memory!.erase({ playerId })`
+forgets a player who deleted their account.
 
 ## Several players
 

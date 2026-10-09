@@ -80,7 +80,7 @@ export function defaultWebSocket(): WebSocketFactory {
         const Native = (globalThis as { WebSocket?: new (url: string) => WebSocketLike }).WebSocket;
         if (!Native) {
             throw new ConfigurationError(
-                "This runtime has no WebSocket. Use Node 22 or later, or pass webSocket: (url) => new WebSocket(url) with the ws package.",
+                "This runtime has no WebSocket (Node before 22). Pass new NurClient({ webSocket: (url) => new WebSocket(url) }) with the ws package, or use Node 22 or later. Minting client secrets and memory need no WebSocket.",
             );
         }
         return new Native(url);

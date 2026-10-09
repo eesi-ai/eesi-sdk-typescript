@@ -1,4 +1,5 @@
 // What a memory is, and where memories are kept.
+import { randomHex } from "../protocol.js";
 /**
  * What a memory is about, and which layer it belongs to.
  *
@@ -29,9 +30,7 @@ export function isActive(record, now = Date.now() / 1000) {
     return record.supersededBy === null && (record.expiresAt === null || record.expiresAt > now);
 }
 export function newMemoryId() {
-    const bytes = new Uint8Array(10);
-    globalThis.crypto.getRandomValues(bytes);
-    return `mem_${Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("")}`;
+    return `mem_${randomHex(20)}`;
 }
 /** A record with defaults for everything not given. */
 export function makeRecord(fields) {

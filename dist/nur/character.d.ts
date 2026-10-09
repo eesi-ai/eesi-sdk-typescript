@@ -192,6 +192,28 @@ export declare class Character {
     /** A short-lived credential that opens a session already configured as this character. See `NurClient.clientSecret`. */
     clientSecret(options?: Parameters<NurClient["clientSecret"]>[1]): Promise<ClientSecret>;
     /**
+     * Learn from a call a player's client opened with a client secret.
+     * `event` is the `session.ended` webhook, verified with `verifyWebhook`
+     * (`@eesi/sdk/node`); its transcript is what the player and the character
+     * said. What was worth keeping becomes this player's memories (under the
+     * memory policy's `rules`), and their next client secret starts with it.
+     */
+    learnFromSession(event: {
+        type: string;
+        session_id?: string;
+        transcript?: Array<{
+            role: string;
+            text: string;
+        }>;
+    }, options: {
+        playerId: string;
+        playerName?: string | null;
+    }): Promise<{
+        added: MemoryRecord[];
+        superseded: MemoryRecord[];
+        forgotten: string[];
+    }>;
+    /**
      * Run one of the character's tools for a call a client forwarded to your
      * server (a session opened with a client secret). Same validation,
      * `allow` and `confirm` as in a session; `ctx.session` is null.

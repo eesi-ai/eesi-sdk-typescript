@@ -194,17 +194,17 @@ export class NurClient {
         const audio = await this.http.createSpeech({
             body: { model: "nur-tts-v1", input: sentence, voice: "auto", instructions: description, language, response_format: "wav" },
         });
-        const file = new File([audio.slice().buffer], `${name}.wav`, { type: "audio/wav" });
-        const created = (await this.http.createVoice({
-            file,
-            name,
-            // A designed voice is synthetic: no person's voice is cloned.
-            consentAttested: true,
-            refText: sentence,
-            language,
-            category: "characters",
-            description: `Designed: ${description}`.slice(0, 500),
-        }));
+        // Built by hand so the file keeps its name on every runtime (Node 18 has no global File).
+        const form = new FormData();
+        form.append("file", new Blob([audio.slice().buffer], { type: "audio/wav" }), `${name}.wav`);
+        form.append("name", name);
+        // A designed voice is synthetic: no person's voice is cloned.
+        form.append("consent_attested", "true");
+        form.append("ref_text", sentence);
+        form.append("language", language);
+        form.append("category", "characters");
+        form.append("description", `Designed: ${description}`.slice(0, 500));
+        const created = await this.http.call("POST", "/voices", { form });
         const id = String(created.voice_id ?? created.id);
         let status = String(created.status ?? "processing");
         const deadline = Date.now() + (options.waitMs ?? 60_000);

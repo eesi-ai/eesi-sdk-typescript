@@ -416,6 +416,28 @@ export class Character {
     }
 
     /**
+     * Learn from a call a player's client opened with a client secret.
+     * `event` is the `session.ended` webhook, verified with `verifyWebhook`
+     * (`@eesi/sdk/node`); its transcript is what the player and the character
+     * said. What was worth keeping becomes this player's memories (under the
+     * memory policy's `rules`), and their next client secret starts with it.
+     */
+    async learnFromSession(
+        event: { type: string; session_id?: string; transcript?: Array<{ role: string; text: string }> },
+        options: { playerId: string; playerName?: string | null },
+    ): Promise<{ added: MemoryRecord[]; superseded: MemoryRecord[]; forgotten: string[] }> {
+        if (!this.memory) throw new ConfigurationError(`${this.name} has no memory. Create it with memory: true or a store.`);
+        if (event.type !== "session.ended" || !event.transcript?.length) return { added: [], superseded: [], forgotten: [] };
+        const lines = event.transcript.map((line): [string, string] => [line.role === "player" ? "player" : this.name, String(line.text ?? "")]);
+        return this.memory.learn(lines, {
+            playerId: options.playerId,
+            playerName: options.playerName ?? null,
+            sessionId: event.session_id ?? null,
+            skipKinds: this.personalize ? [] : ["preference"],
+        });
+    }
+
+    /**
      * Run one of the character's tools for a call a client forwarded to your
      * server (a session opened with a client secret). Same validation,
      * `allow` and `confirm` as in a session; `ctx.session` is null.

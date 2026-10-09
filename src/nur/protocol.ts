@@ -39,9 +39,20 @@ export function eventId(): string {
     return `evt_${randomHex(20)}`;
 }
 
+/**
+ * Random bytes for ids (events, items, memories), never for secrets. Web
+ * Crypto where the platform has it; Node 18 does not expose it to modules.
+ */
+export function randomBytes(length: number): Uint8Array {
+    const bytes = new Uint8Array(length);
+    const webCrypto = (globalThis as { crypto?: { getRandomValues?: (array: Uint8Array) => Uint8Array } }).crypto;
+    if (webCrypto?.getRandomValues) webCrypto.getRandomValues(bytes);
+    else for (let index = 0; index < length; index += 1) bytes[index] = Math.floor(Math.random() * 256);
+    return bytes;
+}
+
 export function randomHex(length: number): string {
-    const bytes = new Uint8Array(Math.ceil(length / 2));
-    globalThis.crypto.getRandomValues(bytes);
+    const bytes = randomBytes(Math.ceil(length / 2));
     return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("").slice(0, length);
 }
 

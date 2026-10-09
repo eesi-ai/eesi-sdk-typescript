@@ -51,11 +51,13 @@ export interface MemoryPolicy {
     weights?: RecallWeights;
     /** Your own extraction model; the default asks nur-llm-v1 with your key. */
     extractor?: Extractor;
+    /** What may be remembered, in your words, for the default extractor: "Only game facts... never age, school, location or social accounts." */
+    rules?: string;
 }
 
 /** A store plus a policy: what you pass as a character's `memory`. */
 export class Memory {
-    readonly policy: Required<Omit<MemoryPolicy, "redact" | "extractor" | "retentionDays">> & Pick<MemoryPolicy, "redact" | "extractor" | "retentionDays">;
+    readonly policy: Required<Omit<MemoryPolicy, "redact" | "extractor" | "retentionDays" | "rules">> & Pick<MemoryPolicy, "redact" | "extractor" | "retentionDays" | "rules">;
 
     constructor(
         readonly store: MemoryStore = new InMemoryStore(),
@@ -72,6 +74,7 @@ export class Memory {
             redact: policy.redact,
             extractor: policy.extractor,
             retentionDays: policy.retentionDays,
+            rules: policy.rules,
         };
     }
 }
@@ -280,7 +283,7 @@ export class CharacterMemory {
         transcript: Array<[string, string]>,
         options: { playerId: string; playerName?: string | null; sessionId?: string | null; skipKinds?: MemoryKind[] },
     ): Promise<{ added: MemoryRecord[]; superseded: MemoryRecord[]; forgotten: string[] }> {
-        const extractor = this.policy.extractor ?? (this.chat ? llmExtractor(this.chat) : null);
+        const extractor = this.policy.extractor ?? (this.chat ? llmExtractor(this.chat, { rules: this.policy.rules }) : null);
         if (!extractor || !transcript.some(([, text]) => text.trim())) return { added: [], superseded: [], forgotten: [] };
         const existing = (await this.scope(options.playerId)).filter((record) => record.kind !== "summary").slice(0, 60);
         let result = await extractor({

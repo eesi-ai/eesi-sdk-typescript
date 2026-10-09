@@ -9,6 +9,11 @@ may change public APIs; such changes are listed under **Changed**.
 
 ### Added
 
+- `character.learnFromSession(event, { playerId })`: learn a player's
+  memories from a client-secret session's `session.ended` webhook, which now
+  carries the whole transcript; `input.completed` posts what the player said.
+- `MemoryPolicy.rules`: what may be remembered, in your words (for example,
+  game facts only for young players).
 - The Nur SDK, in the same package as the REST client:
   `import { NurClient, joinSession } from "@eesi/sdk"`.
 - Characters: persona, traits, speaking style, goals, boundaries, knowledge,
@@ -45,4 +50,5 @@ may change public APIs; such changes are listed under **Changed**.
 
 ### Changed
 
-- Node 22 or later (a global WebSocket). Older runtimes pass `webSocket`.
+- Node 18 or later. Live sessions on your server use the platform's WebSocket
+  (Node 22+); on Node 18 or 20 pass `webSocket` from the `ws` package.

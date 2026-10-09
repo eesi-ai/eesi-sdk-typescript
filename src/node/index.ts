@@ -308,8 +308,12 @@ export interface WebhookEvent {
     session_id: string;
     metadata: Record<string, string>;
     response?: { id: string; status: string; text: string };
+    /** `input.completed`: what the player said (`speech`) or typed (`text`). */
+    input?: { item_id: string | null; source: "speech" | "text"; text: string };
     reason?: string;
     duration_seconds?: number;
+    /** `session.ended`: the whole conversation, oldest first; pass the event to `character.learnFromSession`. */
+    transcript?: Array<{ role: "player" | "character"; text: string }>;
 }
 
 /**

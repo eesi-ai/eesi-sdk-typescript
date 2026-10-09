@@ -97,8 +97,16 @@ export function parseExtraction(text: string, ids: Map<string, string>): Extract
     return { summary, memories: memories.slice(0, 8), forget, raw: text };
 }
 
-/** Memory extraction with a chat model. */
-export function llmExtractor(chat: Chat): Extractor {
+/** How a game's own rules are added to the extraction prompt. Shared with the Python SDK. */
+export const RULES_SUFFIX = "\n\nWhat {character} may remember, set by the game, which wins over the rules above where they differ:\n{rules}";
+
+/**
+ * Memory extraction with a chat model. `rules` narrow what may be kept, in
+ * your words: "Only game facts: what they build, their favourite items, the
+ * name they use in the game. Never age, school, location or social accounts."
+ */
+export function llmExtractor(chat: Chat, options: { rules?: string } = {}): Extractor {
+    const rules = options.rules?.trim() || null;
     return async (request) => {
         const transcript = transcriptText(request);
         if (!transcript.trim()) return { summary: null, memories: [], forget: [] };
@@ -107,7 +115,12 @@ export function llmExtractor(chat: Chat): Extractor {
             request.existing.map((record, index) => `m${index + 1}: ${record.text.split(/\s+/).join(" ").trim()}`).join("\n") || "(none)";
         const who = request.playerName || "the player";
         const reply = await chat([
-            { role: "system", content: EXTRACTION_SYSTEM.replaceAll("{character}", request.characterName) },
+            {
+                role: "system",
+                content:
+                    EXTRACTION_SYSTEM.replaceAll("{character}", request.characterName) +
+                    (rules ? RULES_SUFFIX.replaceAll("{character}", request.characterName).replace("{rules}", rules) : ""),
+            },
             {
                 role: "user",
                 content: `The player is ${who}.\n\nExisting memories about them:\n${existing}\n\nConversation, oldest first:\n${transcript}\n\nAnswer with the JSON only.`,
