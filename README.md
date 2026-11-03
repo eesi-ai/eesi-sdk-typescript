@@ -1,6 +1,6 @@
 # EESI for TypeScript
 
-Characters you can talk to in real time on [Nur Live](https://docs.eesi.ai/realtime/live):
+Characters you can talk to in real time on [Nur](https://docs.eesi.ai/realtime/live):
 a persona, a voice, tools, live state from your game or app, long memory of
 every player, several players at once, any language, and characters that
 speak first. Plus a typed client for the rest of the EESI API.
@@ -71,7 +71,7 @@ The npm release (`npm install @eesi/sdk`) is on the way; the code is the same.
 
 ## What you get
 
-- **Real speech to speech.** Nur Live listens while it speaks, decides when a
+- **Real speech to speech.** Nur listens while it speaks, decides when a
   turn has ended, backchannels, and stops when someone cuts in. The SDK drops
   the character's queued audio the moment it is cut off.
 - **Characters, not prompts.** Persona, traits, speaking style, goals,
@@ -333,6 +333,22 @@ import { fileTrace } from "@eesi/sdk/node";
 kael.connect({ playerId: "p42", trace: fileTrace("./traces/kael.jsonl") });   // no words unless { content: true }
 ```
 
+An optional `response.context` event (`ResponseContext`, exported as a type
+from `@eesi/sdk`) projects a staff-visible server receipt into metadata only:
+`responseId`, `receiptId`, `inputSha256`, `providerFormat` (`responses` or
+`chat_completions`), `model`, `itemCount`, `coverage`
+(`serialized_provider_input`), and independently nullable `turnId` and
+`turnRevision`. It retains no words, tool payloads or credentials. Gateway
+privacy is unchanged; ordinary customer routes withhold these receipts.
+
+The SDK emits receipts only for known, unfinished public responses on the
+current connection that have not been cancelled. It tracks at most 2,048
+response IDs per connection; overflow suppresses receipts until reconnect.
+A missing receipt leaves coverage unknown. The hash proves coverage of the
+exact serialized input passed to the text-model SDK, excluding HTTP bytes,
+sampling parameters and TTS settings. It does not establish compliance,
+acting quality, audible playback or approval to publish.
+
 ## The REST API
 
 ```ts
@@ -340,7 +356,7 @@ import { EESIClient } from "@eesi/sdk";
 
 const client = new EESIClient();
 const voices = await client.listVoices();
-const audio = await client.createSpeech({ body: { model: "nur-tts-v1", input: "Hello.", voice: "Atlas", response_format: "wav" } });
+const audio = await client.createSpeech({ body: { model: "nur-v1", input: "Hello.", voice: "Atlas", response_format: "wav" } });
 ```
 
 Every method is generated from the API's own schema.

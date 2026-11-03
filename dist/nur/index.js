@@ -1,4 +1,4 @@
-// The Nur SDK: characters you can talk to in real time on Nur Live.
+// The Nur SDK: characters you can talk to in real time on Nur.
 //
 // Server (Node, Deno, Bun), with your API key:
 //
@@ -21,6 +21,7 @@ export { FRAME_MS, Room, SPEECH_FLOOR } from "./room.js";
 export { renderResult, started, Tool, tool } from "./tools.js";
 export { validateSchema } from "./schema.js";
 export { LiveContext, renderFields } from "./context.js";
+export { mcpServerWire } from "./mcp.js";
 export { EventBus } from "./events.js";
 export * from "./memory/index.js";
 export { asPlayers, PartyLog, playerKey, SpeakerRoster } from "./multiplayer.js";

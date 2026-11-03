@@ -8,10 +8,12 @@ export interface EventBase {
 /** One person's part of a transcript several voices share. */
 export interface SpeakerTurn {
     text: string;
-    /** `Speaker N` as the transcript tagged it; null when there was one voice. */
+    /** `Speaker N` as tagged; null for an unlabelled or explicitly unknown voice. */
     speaker: number | null;
     /** The player the SDK attributes it to, when it knows. */
     playerId: string | null;
+    /** Explicit unknown attribution; never an ordinary unlabelled solo turn. */
+    unattributed?: true;
 }
 export interface SessionStarted extends EventBase {
     type: "session.started";
@@ -55,6 +57,21 @@ export interface TranscriptFinal extends EventBase {
 export interface ResponseStarted extends EventBase {
     type: "response.started";
     responseId: string;
+}
+/** A receipt of serialized text-model input, when the server provides one.
+ * It proves input coverage, never comprehension, task completion or heard audio.
+ */
+export interface ResponseContext extends EventBase {
+    type: "response.context";
+    responseId: string;
+    receiptId: string;
+    inputSha256: string;
+    providerFormat: "chat_completions" | "responses";
+    model: string;
+    itemCount: number;
+    coverage: "serialized_provider_input";
+    turnId: string | null;
+    turnRevision: number | null;
 }
 export interface ResponseTextDelta extends EventBase {
     type: "response.text.delta";
@@ -157,7 +174,58 @@ export interface Feedback extends EventBase {
     note: string | null;
     responseId: string | null;
 }
-export type NurEvent = SessionStarted | SessionEnded | AudioInputStarted | AudioInputEnded | TranscriptPartial | TranscriptFinal | ResponseStarted | ResponseTextDelta | ResponseCompleted | ResponseCancelled | AudioOutputChunk | SpeechInterrupted | MemoryRetrieved | MemoryUpdated | ContextUpdated | ToolStarted | ToolCompleted | ToolFailed | ErrorEvent | Reconnecting | Reconnected | Hangup | Feedback;
+/** EESI listed a remote MCP server's tools; the character can use them now. */
+export interface McpToolsListed extends EventBase {
+    type: "mcp.tools.listed";
+    serverLabel: string;
+    /** The tools the character was offered, by the server's own names. */
+    tools: string[];
+}
+/** A remote MCP server could not be listed; the character goes on without it. */
+export interface McpToolsFailed extends EventBase {
+    type: "mcp.tools.failed";
+    serverLabel: string;
+    /** `not_public`, `unreachable`, `unauthorized`, `timeout`, `http_error`, `protocol_error` or `redirect`. */
+    code: string;
+    message: string;
+}
+/** The character called a remote MCP tool; EESI is running it. */
+export interface McpCallStarted extends EventBase {
+    type: "mcp.call.started";
+    itemId: string;
+    serverLabel: string;
+    name: string;
+    /** The arguments, as JSON text. */
+    arguments: string;
+}
+export interface McpCallCompleted extends EventBase {
+    type: "mcp.call.completed";
+    itemId: string;
+    serverLabel: string;
+    name: string;
+    arguments: string;
+    /** What the server returned, as the character read it. */
+    output: string;
+}
+export interface McpCallFailed extends EventBase {
+    type: "mcp.call.failed";
+    itemId: string;
+    serverLabel: string;
+    name: string;
+    arguments: string;
+    /** `http_error`, `protocol_error` or `tool_execution_error`. */
+    kind: string;
+    error: string;
+}
+/** A tool that changes things waits for the player's yes. The character asks out loud; a button answers with `session.approveMcp(requestId)`. */
+export interface McpApprovalRequested extends EventBase {
+    type: "mcp.approval.requested";
+    requestId: string;
+    serverLabel: string;
+    name: string;
+    arguments: string;
+}
+export type NurEvent = SessionStarted | SessionEnded | AudioInputStarted | AudioInputEnded | TranscriptPartial | TranscriptFinal | ResponseStarted | ResponseContext | ResponseTextDelta | ResponseCompleted | ResponseCancelled | AudioOutputChunk | SpeechInterrupted | MemoryRetrieved | MemoryUpdated | ContextUpdated | ToolStarted | ToolCompleted | ToolFailed | ErrorEvent | Reconnecting | Reconnected | Hangup | Feedback | McpToolsListed | McpToolsFailed | McpCallStarted | McpCallCompleted | McpCallFailed | McpApprovalRequested;
 export type NurEventType = NurEvent["type"];
 /** An exact event type, a family (`"tool.*"`) or everything (`"*"`). */
 export type EventPattern = NurEventType | "*" | `${string}.*`;

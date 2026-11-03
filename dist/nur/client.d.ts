@@ -6,7 +6,7 @@ import type { Proactive } from "./proactive.js";
 import { type Transport, type WebSocketFactory } from "./session.js";
 import type { AnyTool } from "./tools.js";
 export declare const DEFAULT_BASE_URL = "https://api.eesi.ai";
-export declare const DEFAULT_MODEL = "nur-live-v1";
+export declare const DEFAULT_MODEL = "nur-v1";
 export interface NurClientOptions {
     /** Defaults to `EESI_API_KEY`. */
     apiKey?: string;
@@ -38,8 +38,9 @@ export interface Voice {
 }
 /**
  * A voice described in words, created once in your organization's library
- * and reused by name. `description` uses the voice-design vocabulary
- * (`GET /v1/audio/voice-design`), e.g. "male, elderly, low pitch, british accent".
+ * and reused by name. `description` is plain words in any language ("a calm
+ * older man with a deep voice"), or the voice-design vocabulary
+ * ("male, elderly, low pitch, british accent").
  */
 export interface VoiceDesign {
     readonly name: string;
@@ -145,7 +146,7 @@ export interface ClientSecret {
     /** What to send the player's client. */
     join: JoinInfo;
 }
-/** Characters on Nur Live. */
+/** Characters on Nur. */
 export declare class NurClient {
     readonly baseUrl: string;
     readonly realtimeUrl: string;
@@ -191,13 +192,20 @@ export declare class NurClient {
         language?: string;
     }): VoiceDesign;
     /**
-     * Create a voice from a description, or return your voice already named
-     * `name`. It is synthesized once and saved to your library like a clone,
-     * so it sounds the same in every session. No person's recording is used.
+     * Create a voice from a description (or return the voice already named `name`).
+     *
+     * The description can be plain words in any language ("a calm older man
+     * with a deep voice") or the voice-design vocabulary. EESI makes takes of
+     * it (`POST /v1/voices/design`), each a different speaker, and keeps take
+     * number `take` (default the first) as a voice in your library
+     * (`POST /v1/voices/design/keep`), so it sounds the same in every session.
+     * It is a synthetic voice: no person's recording is used, and nothing is
+     * attested.
      */
     designVoice(name: string, description: string, options?: {
         language?: string;
         waitMs?: number;
+        take?: number;
     }): Promise<Voice>;
     /** One completion from EESI's text model (`/v1/chat/completions`). Memory extraction uses it. */
     chat(messages: Array<{

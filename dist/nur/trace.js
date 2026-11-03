@@ -86,6 +86,7 @@ export class Trace {
                 data.turns = value.map((turn) => ({
                     speaker: turn.speaker,
                     player: turn.playerId,
+                    ...(turn.unattributed ? { unattributed: true } : {}),
                     ...(this.content ? { text: turn.text } : { chars: turn.text.length }),
                 }));
             }
@@ -103,6 +104,8 @@ export class Trace {
     }
 }
 function who(turn) {
+    if (turn.unattributed)
+        return "Unattributed voice";
     if (turn.player)
         return String(turn.player);
     if (turn.speaker)

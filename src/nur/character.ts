@@ -21,10 +21,11 @@ import { Room, type RoomOptions } from "./room.js";
 import { Session } from "./session.js";
 import type { Trace } from "./trace.js";
 import { type AnyTool, type ToolContext, ToolRunner } from "./tools.js";
+import { checkMcpServers, type McpServer, toolPatch } from "./mcp.js";
 
 /**
  * Who decides when the character speaks.
- * - `natural` (default): Nur Live's own full-duplex floor control.
+ * - `natural` (default): Nur's own full-duplex floor control.
  * - `app`: the SDK asks for a reply after each finished turn, once fresh state
  *   and memories are in place. Tool use is most reliable here.
  * - `director`: the character only speaks when your code says so.
@@ -62,6 +63,8 @@ export interface CharacterOptions {
     greeting?: boolean | string;
     verbosity?: Verbosity;
     tools?: Array<AnyTool>;
+    /** Remote MCP servers EESI connects to and runs for this character. */
+    mcpServers?: McpServer[];
     /** The character's shared live state (its `world` block). */
     context?: Record<string, unknown>;
     /** true (in memory), a `Memory`, or a `MemoryStore`. Node: `fileMemory("./dir")` from `@eesi/sdk/node`. */
@@ -174,6 +177,8 @@ export class Character {
     readonly metadata: Record<string, unknown>;
     readonly proactive: Proactive | null;
     tools: Array<AnyTool>;
+    /** Remote MCP servers EESI connects to and runs for this character. */
+    readonly mcpServers: McpServer[];
     readonly triggers: Trigger[] = [];
     /** The character's shared live state: its `world` block, in every session. */
     readonly context = new LiveContext("world");
@@ -225,6 +230,7 @@ export class Character {
         const proactive = options.proactive ?? defaults.proactive;
         this.proactive = proactive === true ? {} : proactive && typeof proactive === "object" ? proactive : null;
         this.tools = [...(options.tools ?? [])];
+        this.mcpServers = checkMcpServers(options.mcpServers ?? []);
         this.party = (options.party ?? defaults.party) ? new PartyLog() : null;
         this.bus = new EventBus(client.logger);
         if (options.context) this.context.seed(options.context);
@@ -300,8 +306,7 @@ export class Character {
         const config: Record<string, unknown> = {
             instructions,
             audio: { output, input: { turn_detection: turnDetection, transcription } },
-            tools: session.toolSpecs,
-            tool_choice: session.toolSpecs.length ? "auto" : "none",
+            ...toolPatch(session.toolSpecs, this.mcpServers),
         };
         if (pinned) {
             const [code, name] = pinned;
@@ -497,6 +502,8 @@ export class Character {
                   }
                 : null,
             tools: this.tools.map((item) => item.name),
+            // By label: a server's address and token are not saved with the character.
+            mcp_servers: this.mcpServers.map((server) => server.label),
             context: this.context.get("world"),
         };
     }
@@ -506,6 +513,7 @@ export class Character {
         const made = new Character(this.client, {
             ...this.options,
             tools: this.tools,
+            mcpServers: this.mcpServers,
             memory: this.memory?.memory,
             context: this.context.get("world"),
             ...changes,
@@ -515,8 +523,8 @@ export class Character {
     }
 }
 
-/** Options from a saved character (`toJSON()`), in either SDK's form. */
-export function characterOptionsFromJSON(data: Record<string, unknown>, tools: Array<AnyTool> = []): CharacterOptions {
+/** Options from a saved character (`toJSON()`), in either SDK's form. Pass its tools and MCP servers again: functions and server tokens are not saved. */
+export function characterOptionsFromJSON(data: Record<string, unknown>, tools: Array<AnyTool> = [], mcpServers: McpServer[] = []): CharacterOptions {
     const get = <T>(snake: string, camel: string): T | undefined => (data[snake] ?? data[camel] ?? undefined) as T | undefined;
     const voice = data.voice as unknown;
     const proactive = data.proactive as Record<string, unknown> | null | undefined;
@@ -551,6 +559,7 @@ export function characterOptionsFromJSON(data: Record<string, unknown>, tools: A
         metadata: get<Record<string, unknown>>("metadata", "metadata"),
         context: get<Record<string, unknown>>("context", "context"),
         tools,
+        mcpServers,
         proactive: proactive
             ? {
                   idleAfterMs: proactive.idle_after === null ? null : Number(proactive.idle_after ?? 25) * 1000,

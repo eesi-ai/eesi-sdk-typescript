@@ -1,4 +1,4 @@
-// The Nur SDK: characters you can talk to in real time on Nur Live.
+// The Nur SDK: characters you can talk to in real time on Nur.
 //
 // Server (Node, Deno, Bun), with your API key:
 //
@@ -29,6 +29,8 @@ export type { AnyTool, Started, ToolContext, ToolDefinition } from "./tools.js";
 export { validateSchema } from "./schema.js";
 export type { FromSchema, JSONSchema, ObjectSchema, SchemaType } from "./schema.js";
 export { LiveContext, renderFields } from "./context.js";
+export { mcpServerWire } from "./mcp.js";
+export type { McpServer } from "./mcp.js";
 export { EventBus } from "./events.js";
 export type {
     AudioInputEnded,
@@ -43,6 +45,12 @@ export type {
     Handler,
     Hangup,
     Logger,
+    McpApprovalRequested,
+    McpCallCompleted,
+    McpCallFailed,
+    McpCallStarted,
+    McpToolsFailed,
+    McpToolsListed,
     MemoryRetrieved,
     MemoryUpdated,
     NurEvent,
@@ -51,6 +59,7 @@ export type {
     Reconnecting,
     ResponseCancelled,
     ResponseCompleted,
+    ResponseContext,
     ResponseStarted,
     ResponseTextDelta,
     SessionEnded,

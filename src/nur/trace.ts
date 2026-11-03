@@ -93,9 +93,10 @@ export class Trace {
             } else if (key === "added" || key === "updated") {
                 data[key] = (value as MemoryRecord[]).map((record) => ({ id: record.id, kind: record.kind, ...(this.content ? { text: record.text } : {}) }));
             } else if (key === "turns") {
-                data.turns = (value as Array<{ speaker: number | null; playerId: string | null; text: string }>).map((turn) => ({
+                data.turns = (value as Array<{ speaker: number | null; playerId: string | null; text: string; unattributed?: true }>).map((turn) => ({
                     speaker: turn.speaker,
                     player: turn.playerId,
+                    ...(turn.unattributed ? { unattributed: true } : {}),
                     ...(this.content ? { text: turn.text } : { chars: turn.text.length }),
                 }));
             } else if (CONTENT_FIELDS.has(key) && !this.content && value !== null && value !== undefined && value !== "" && !(typeof value === "object" && Object.keys(value).length === 0)) {
@@ -113,6 +114,7 @@ export class Trace {
 }
 
 function who(turn: Record<string, unknown>): string {
+    if (turn.unattributed) return "Unattributed voice";
     if (turn.player) return String(turn.player);
     if (turn.speaker) return `Speaker ${turn.speaker}`;
     return "player";

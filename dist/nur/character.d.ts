@@ -10,9 +10,10 @@ import { Room, type RoomOptions } from "./room.js";
 import { Session } from "./session.js";
 import type { Trace } from "./trace.js";
 import { type AnyTool } from "./tools.js";
+import { type McpServer } from "./mcp.js";
 /**
  * Who decides when the character speaks.
- * - `natural` (default): Nur Live's own full-duplex floor control.
+ * - `natural` (default): Nur's own full-duplex floor control.
  * - `app`: the SDK asks for a reply after each finished turn, once fresh state
  *   and memories are in place. Tool use is most reliable here.
  * - `director`: the character only speaks when your code says so.
@@ -40,6 +41,8 @@ export interface CharacterOptions {
     greeting?: boolean | string;
     verbosity?: Verbosity;
     tools?: Array<AnyTool>;
+    /** Remote MCP servers EESI connects to and runs for this character. */
+    mcpServers?: McpServer[];
     /** The character's shared live state (its `world` block). */
     context?: Record<string, unknown>;
     /** true (in memory), a `Memory`, or a `MemoryStore`. Node: `fileMemory("./dir")` from `@eesi/sdk/node`. */
@@ -127,6 +130,8 @@ export declare class Character {
     readonly metadata: Record<string, unknown>;
     readonly proactive: Proactive | null;
     tools: Array<AnyTool>;
+    /** Remote MCP servers EESI connects to and runs for this character. */
+    readonly mcpServers: McpServer[];
     readonly triggers: Trigger[];
     /** The character's shared live state: its `world` block, in every session. */
     readonly context: LiveContext;
@@ -227,6 +232,6 @@ export declare class Character {
     /** A new character with these options changed (a variant, a new version). Tools, triggers and memory carry over. */
     clone(changes?: Partial<CharacterOptions>): Character;
 }
-/** Options from a saved character (`toJSON()`), in either SDK's form. */
-export declare function characterOptionsFromJSON(data: Record<string, unknown>, tools?: Array<AnyTool>): CharacterOptions;
+/** Options from a saved character (`toJSON()`), in either SDK's form. Pass its tools and MCP servers again: functions and server tokens are not saved. */
+export declare function characterOptionsFromJSON(data: Record<string, unknown>, tools?: Array<AnyTool>, mcpServers?: McpServer[]): CharacterOptions;
 //# sourceMappingURL=character.d.ts.map

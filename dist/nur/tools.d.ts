@@ -97,7 +97,7 @@ export declare class ToolRunner {
     /** Record `callId`; true when it was already handled (a duplicate frame). */
     seen(callId: string): boolean;
     /** Answer one call. Never throws. */
-    run(callId: string, name: string, rawArguments: string): Promise<Outcome>;
+    run(callId: string, name: string, rawArguments: string, context?: (callId: string, args: Record<string, unknown>) => ToolContext): Promise<Outcome>;
     private fail;
 }
 export {};

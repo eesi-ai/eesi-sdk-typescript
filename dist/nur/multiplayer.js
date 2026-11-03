@@ -3,7 +3,7 @@
 // - One session per player (separate machines): with `party: true` the
 //   character keeps a party log of who said what to whom, shared by its
 //   sessions as the `party` block, so its story stays straight.
-// - One conversation, several people: Nur Live tags each line `Speaker N:`
+// - One conversation, several people: Nur tags each line `Speaker N:`
 //   once it has heard a second voice; name the `players` and a roster binds
 //   those numbers to them. A `Room` binds them by who was loudest instead.
 import { splitSpeakerTurns } from "./protocol.js";
@@ -103,7 +103,9 @@ export class SpeakerRoster {
         return new Map(this.bySpeaker);
     }
     attribute(transcript) {
-        return splitSpeakerTurns(transcript).map(({ speaker, text }) => {
+        return splitSpeakerTurns(transcript).map(({ speaker, text, unattributed }) => {
+            if (unattributed)
+                return { text, speaker: null, player: null, unattributed: true };
             const hello = this.named(text, INTRODUCTION);
             if (hello && speaker === null && !this.helloOrder.includes(hello))
                 this.helloOrder.push(hello);

@@ -3,7 +3,7 @@
 // After a session the SDK can ask a language model what is worth keeping:
 // who the player is, what they prefer, what happened, what was promised, how
 // the relationship changed, and which old memories a correction replaces.
-// The default extractor asks EESI's text model (`nur-llm-v1`) with your API
+// The default extractor asks EESI's text model (`nur-v1`) with your API
 // key; pass `extractor` in the memory policy to use your own, or
 // `extract: false` to learn nothing on your behalf. This updates a memory
 // store. It does not train or fine-tune any model.

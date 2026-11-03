@@ -192,7 +192,7 @@ export class ToolRunner {
     }
 
     /** Answer one call. Never throws. */
-    async run(callId: string, name: string, rawArguments: string): Promise<Outcome> {
+    async run(callId: string, name: string, rawArguments: string, context = this.context): Promise<Outcome> {
         const startedAt = Date.now();
         let args: Record<string, unknown>;
         try {
@@ -220,7 +220,7 @@ export class ToolRunner {
                 return this.fail(callId, name, args, "invalid_arguments", `The arguments were not valid: ${message(error)}.`);
             }
         }
-        const ctx = this.context(callId, args);
+        const ctx = context(callId, args);
         if (definition.allow) {
             let verdict: boolean | string;
             try {

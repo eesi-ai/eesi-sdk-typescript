@@ -17,12 +17,7 @@ import { ConfigurationError, NurError } from "./errors.js";
 import { asPlayers } from "./multiplayer.js";
 import { defaultWebSocket, Session } from "./session.js";
 export const DEFAULT_BASE_URL = "https://api.eesi.ai";
-export const DEFAULT_MODEL = "nur-live-v1";
-/** A sentence a designed voice is frozen from; it becomes the clone's reference text. Shared with the Python SDK. */
-const DESIGN_SENTENCES = {
-    en: "Every voice carries a story, and how we say it matters.",
-    ar: "لكل صوت حكاية، وطريقة قولها لا تقل أهمية عن الكلمات.",
-};
+export const DEFAULT_MODEL = "nur-v1";
 const VOICE_CACHE_MS = 300_000;
 function env(name) {
     return globalThis.process?.env?.[name];
@@ -45,7 +40,7 @@ class Rest extends EESIClient {
         return this.request(method, path, options);
     }
 }
-/** Characters on Nur Live. */
+/** Characters on Nur. */
 export class NurClient {
     baseUrl;
     realtimeUrl;
@@ -181,30 +176,31 @@ export class NurClient {
         return { name, description, language: options.language ?? "en" };
     }
     /**
-     * Create a voice from a description, or return your voice already named
-     * `name`. It is synthesized once and saved to your library like a clone,
-     * so it sounds the same in every session. No person's recording is used.
+     * Create a voice from a description (or return the voice already named `name`).
+     *
+     * The description can be plain words in any language ("a calm older man
+     * with a deep voice") or the voice-design vocabulary. EESI makes takes of
+     * it (`POST /v1/voices/design`), each a different speaker, and keeps take
+     * number `take` (default the first) as a voice in your library
+     * (`POST /v1/voices/design/keep`), so it sounds the same in every session.
+     * It is a synthetic voice: no person's recording is used, and nothing is
+     * attested.
      */
     async designVoice(name, description, options = {}) {
         const language = options.language ?? "en";
         const existing = (await this.voices()).find((item) => item.name.toLowerCase() === name.toLowerCase() && !item.isBuiltin);
         if (existing)
             return existing;
-        const sentence = DESIGN_SENTENCES[language] ?? DESIGN_SENTENCES.en;
-        const audio = await this.http.createSpeech({
-            body: { model: "nur-tts-v1", input: sentence, voice: "auto", instructions: description, language, response_format: "wav" },
+        const designed = await this.http.call("POST", "/voices/design", {
+            json: { description, language },
         });
-        // Built by hand so the file keeps its name on every runtime (Node 18 has no global File).
-        const form = new FormData();
-        form.append("file", new Blob([audio.slice().buffer], { type: "audio/wav" }), `${name}.wav`);
-        form.append("name", name);
-        // A designed voice is synthetic: no person's voice is cloned.
-        form.append("consent_attested", "true");
-        form.append("ref_text", sentence);
-        form.append("language", language);
-        form.append("category", "characters");
-        form.append("description", `Designed: ${description}`.slice(0, 500));
-        const created = await this.http.call("POST", "/voices", { form });
+        const takes = designed?.takes ?? [];
+        if (!takes.length)
+            throw new NurError(`No takes of the voice ${JSON.stringify(name)} could be made.`);
+        const chosen = takes[Math.min(Math.max(options.take ?? 0, 0), takes.length - 1)];
+        const created = await this.http.call("POST", "/voices/design/keep", {
+            json: { take_id: chosen.take_id, audio: chosen.audio, name },
+        });
         const id = String(created.voice_id ?? created.id);
         let status = String(created.status ?? "processing");
         const deadline = Date.now() + (options.waitMs ?? 60_000);
@@ -216,13 +212,22 @@ export class NurClient {
                 throw new NurError(`Designing the voice ${JSON.stringify(name)} failed.`);
         }
         this.voiceCache = null;
-        return { id, name, isBuiltin: false, status, language, gender: null, category: "characters", description };
+        return {
+            id,
+            name,
+            isBuiltin: false,
+            status,
+            language,
+            gender: typeof created.gender === "string" ? created.gender : null,
+            category: typeof created.category === "string" ? created.category : "characters",
+            description: typeof created.description === "string" ? created.description : description,
+        };
     }
     // ── text and credentials ─────────────────────────────────────────────
     /** One completion from EESI's text model (`/v1/chat/completions`). Memory extraction uses it. */
     async chat(messages, options = {}) {
         const body = {
-            model: options.model ?? "nur-llm-v1",
+            model: options.model ?? "nur-v1",
             messages,
             temperature: options.temperature ?? 0.2,
             max_tokens: options.maxTokens ?? 900,

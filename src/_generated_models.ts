@@ -4,62 +4,6 @@
  */
 
 export interface paths {
-    "/v1/failures": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Failures */
-        get: operations["list_failures_v1_failures_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/failures/scorecard": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Scorecard
-         * @description The plan's scorecard (§8) cut by what actually served each session,
-         *     so "which release produced the improvement?" is a row, not a guess.
-         */
-        get: operations["get_scorecard_v1_failures_scorecard_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/failures/{failure_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get Failure */
-        get: operations["get_failure_v1_failures__failure_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /** Update Failure */
-        patch: operations["update_failure_v1_failures__failure_id__patch"];
-        trace?: never;
-    };
     "/v1/user/api-keys": {
         parameters: {
             query?: never;
@@ -369,6 +313,53 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/voices/design": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Design Voice
+         * @description Hear a described voice three ways: each take is another speaker.
+         *
+         *     Nothing is kept. Each take comes back with a `take_id`; send one to
+         *     `POST /v1/voices/design/keep` within an hour to make it a voice.
+         */
+        post: operations["design_voice_v1_voices_design_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/voices/design/keep": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Keep Designed Voice
+         * @description Keep a take: it becomes a voice, cloned from that take.
+         *
+         *     No consent is attested because no one's voice is in it; the take id
+         *     proves this server made the audio, for this organization, within the
+         *     hour.
+         */
+        post: operations["keep_designed_voice_v1_voices_design_keep_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/voices/{voice_id}": {
         parameters: {
             query?: never;
@@ -488,6 +479,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/phone/readiness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Phone Readiness */
+        get: operations["phone_readiness_v1_phone_readiness_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/phone/inbound-admission": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Configure Phone Admission */
+        put: operations["configure_phone_admission_v1_phone_inbound_admission_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/phone/calls": {
         parameters: {
             query?: never;
@@ -519,7 +544,8 @@ export interface paths {
         get: operations["get_phone_call_v1_phone_calls__call_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /** Cancel Phone Call */
+        delete: operations["cancel_phone_call_v1_phone_calls__call_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -763,6 +789,11 @@ export interface components {
              * @default false
              */
             stream: boolean;
+            /**
+             * Store
+             * @default true
+             */
+            store: boolean;
         };
         /** Body_create_voice_v1_voices_post */
         Body_create_voice_v1_voices_post: {
@@ -779,10 +810,10 @@ export interface components {
             ref_text?: string | null;
             /**
              * Engine
-             * @default nur-tts-v1
+             * @default nur-v1
              * @enum {string}
              */
-            engine: "nur-tts-v1" | "omnivoice";
+            engine: "nur-v1";
             /**
              * Category
              * @default general
@@ -804,58 +835,6 @@ export interface components {
         Body_separate_reference_clip_v1_voices_separate_post: {
             /** File */
             file: string;
-        };
-        /**
-         * BundleScorecard
-         * @description One runtime bundle's sessions in the window, and how they went.
-         *
-         *     Every number here is what the runtime measured, not a judge's opinion:
-         *     how sessions ended, how much evidence they left, how long replies took,
-         *     and which deterministic failure signals were raised. Coverage travels
-         *     with the rates so a percentage over sessions with no transcript is never
-         *     mistaken for a percentage over the truth.
-         */
-        BundleScorecard: {
-            /** Digest */
-            digest: string;
-            /** Bundle */
-            bundle?: {
-                [key: string]: unknown;
-            };
-            /** Sessions */
-            sessions: number;
-            /** First Seen */
-            first_seen?: string | null;
-            /** Last Seen */
-            last_seen?: string | null;
-            /** Ended By Error */
-            ended_by_error: number;
-            /** Ended By Limit */
-            ended_by_limit: number;
-            /** With Transcript */
-            with_transcript: number;
-            /** With Journal */
-            with_journal: number;
-            /** Turns */
-            turns: number;
-            /** Reply P50 Ms */
-            reply_p50_ms?: number | null;
-            /** Reply P95 Ms */
-            reply_p95_ms?: number | null;
-            /** Barge Ins */
-            barge_ins: number;
-            /** Failures */
-            failures: number;
-            /** Open Failures */
-            open_failures: number;
-            /** By Severity */
-            by_severity: {
-                [key: string]: number;
-            };
-            /** By Signal */
-            by_signal: {
-                [key: string]: number;
-            };
         };
         /**
          * ClientSecretControl
@@ -1151,6 +1130,10 @@ export interface components {
             instructions?: string | null;
             /** Source */
             source?: string | null;
+            /** Part */
+            part?: string | null;
+            /** Part Label */
+            part_label?: string | null;
             /** Created At */
             created_at?: string | null;
             /** Audio Bytes */
@@ -1173,68 +1156,39 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
-        /** InteractionFailure */
-        InteractionFailure: {
-            /** Id */
-            id: string;
-            /** Session Id */
-            session_id: string;
-            /** Signal */
-            signal: string;
-            /** Severity */
-            severity: string;
-            /** Confidence */
-            confidence: number;
-            /** Rank */
-            rank: number;
-            /** Turn Index */
-            turn_index?: number | null;
-            /** Evidence */
-            evidence?: {
-                [key: string]: unknown;
-            };
-            /** Detector Version */
-            detector_version: string;
-            /** Runtime Bundle Digest */
-            runtime_bundle_digest?: string | null;
-            /** Status */
-            status: string;
-            /** Notes */
-            notes?: string | null;
-            /** Owner User Id */
-            owner_user_id?: number | null;
+        /**
+         * KeepDesignedVoiceRequest
+         * @description One take from POST /v1/voices/design, sent back exactly as it came.
+         */
+        KeepDesignedVoiceRequest: {
+            /** Take Id */
+            take_id: string;
+            /** Audio */
+            audio: string;
+            /** Name */
+            name: string;
             /**
-             * Created At
-             * Format: date-time
+             * Category
+             * @default characters
+             * @enum {string}
              */
-            created_at: string;
-            /**
-             * Updated At
-             * Format: date-time
-             */
-            updated_at: string;
+            category: "general" | "conversational" | "narrative" | "podcast" | "customer-service" | "corporate" | "advertising" | "characters";
         };
-        /** InteractionFailureList */
-        InteractionFailureList: {
-            /** Items */
-            items: components["schemas"]["InteractionFailure"][];
-            /** Total */
-            total: number;
-            /** Limit */
-            limit: number;
-            /** Offset */
-            offset: number;
-            /** Counts */
-            counts?: {
-                [key: string]: number;
-            };
-        };
-        /** InteractionFailureUpdate */
-        InteractionFailureUpdate: {
-            /** Status */
-            status?: ("open" | "triaged" | "reproduced" | "fixed" | "dismissed" | "invalid") | null;
-            /** Notes */
-            notes?: string | null;
+        /**
+         * LatencyBin
+         * @description One bar of the fine distribution, on a log scale of milliseconds.
+         *
+         *     Lower exclusive, upper inclusive, like :class:`LatencyBucket`. The first
+         *     bin starts at 0 and the last has no upper bound (null is infinity), so the
+         *     bins together count every measured turn exactly once.
+         */
+        LatencyBin: {
+            /** Lower Ms */
+            lower_ms: number;
+            /** Upper Ms */
+            upper_ms: number | null;
+            /** Count */
+            count: number;
         };
         /**
          * LatencyBucket
@@ -1245,6 +1199,23 @@ export interface components {
             upper_ms: number | null;
             /** Count */
             count: number;
+        };
+        /**
+         * LatencyDay
+         * @description One UTC day of measured turns; null percentiles when none was timed.
+         */
+        LatencyDay: {
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /** Measured */
+            measured: number;
+            /** P50 Ms */
+            p50_ms?: number | null;
+            /** P95 Ms */
+            p95_ms?: number | null;
         };
         /**
          * ListenerBrief
@@ -1298,6 +1269,22 @@ export interface components {
             since?: string | null;
             summary: components["schemas"]["TurnMetricsSummary"];
         };
+        /** PhoneAdmissionConfiguration */
+        PhoneAdmissionConfiguration: {
+            /** Phone Number Id */
+            phone_number_id: number;
+            /** Url */
+            url: string;
+            /** Secret */
+            secret: string;
+        };
+        /** PhoneAdmissionStatus */
+        PhoneAdmissionStatus: {
+            /** Phone Number Id */
+            phone_number_id: number;
+            /** Enabled */
+            enabled: boolean;
+        };
         /**
          * PhoneCall
          * @description One call: where it stands, and when it is over, what was said.
@@ -1311,19 +1298,33 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "dialing" | "in_progress" | "completed" | "not_answered";
+            status: "dispatching" | "dialing" | "in_progress" | "completed" | "not_answered" | "unknown" | "failed" | "cancelled" | "voicemail";
             /** To */
             to: string;
             /** Created At */
             created_at: number;
             /** Duration Seconds */
             duration_seconds?: number | null;
+            /**
+             * Duration Final
+             * @default false
+             */
+            duration_final: boolean;
             /** Transcript */
             transcript?: components["schemas"]["PhoneCallTurn"][] | null;
             /** Metadata */
             metadata?: {
                 [key: string]: string;
             } | null;
+            /** Outcome */
+            outcome?: string | null;
+            /** Answered By */
+            answered_by?: string | null;
+            /**
+             * Opt Out
+             * @default false
+             */
+            opt_out: boolean;
         };
         /**
          * PhoneCallRequest
@@ -1342,6 +1343,35 @@ export interface components {
             metadata?: {
                 [key: string]: string;
             } | null;
+            /** Request Id */
+            request_id?: string | null;
+            /**
+             * Max Duration Seconds
+             * @default 1800
+             */
+            max_duration_seconds: number;
+            /** End At */
+            end_at?: number | null;
+            /**
+             * Record Audio
+             * @default false
+             */
+            record_audio: boolean;
+            /**
+             * Train
+             * @default false
+             */
+            train: boolean;
+            /**
+             * Answering Machine Detection
+             * @default true
+             */
+            answering_machine_detection: boolean;
+            /**
+             * Allow Opt Out
+             * @default false
+             */
+            allow_opt_out: boolean;
         };
         /** PhoneCallTurn */
         PhoneCallTurn: {
@@ -1388,6 +1418,8 @@ export interface components {
             code: string;
             /** Name */
             name?: string | null;
+            /** Verification Id */
+            verification_id?: string | null;
         };
         /** PhoneNumberList */
         PhoneNumberList: {
@@ -1404,6 +1436,49 @@ export interface components {
              * @enum {string}
              */
             channel: "text" | "call";
+            /** Verification Id */
+            verification_id?: string | null;
+        };
+        /** PhoneReadiness */
+        PhoneReadiness: {
+            /** Ready */
+            ready: boolean;
+            /** Dedicated Line */
+            dedicated_line: boolean;
+            /** Signed Outcomes */
+            signed_outcomes: boolean;
+            /**
+             * Durable Operations
+             * @default true
+             */
+            durable_operations: boolean;
+            /**
+             * Answering Machine Detection
+             * @default true
+             */
+            answering_machine_detection: boolean;
+            /**
+             * Ephemeral Recipient Proof
+             * @default true
+             */
+            ephemeral_recipient_proof: boolean;
+            /**
+             * Max Duration Seconds
+             * @default 28800
+             */
+            max_duration_seconds: number;
+            /**
+             * Inbound
+             * @default false
+             */
+            inbound: boolean;
+            /**
+             * Inbound Pin
+             * @default false
+             */
+            inbound_pin: boolean;
+            /** Inbound Number */
+            inbound_number?: string | null;
         };
         /**
          * RealtimeSessionUsageResponse
@@ -1437,18 +1512,6 @@ export interface components {
              * @default false
              */
             recording_truncated: boolean;
-        };
-        /** ScorecardResponse */
-        ScorecardResponse: {
-            /** Days */
-            days: number;
-            /**
-             * Since
-             * Format: date-time
-             */
-            since: string;
-            /** Bundles */
-            bundles: components["schemas"]["BundleScorecard"][];
         };
         /** SentText */
         SentText: {
@@ -1555,6 +1618,11 @@ export interface components {
             normalize_text: boolean;
             /** Source */
             source?: string | null;
+            /**
+             * Store
+             * @default true
+             */
+            store: boolean;
         };
         /** TextRequest */
         TextRequest: {
@@ -1613,6 +1681,10 @@ export interface components {
             eou_to_first_audio_max_ms?: number | null;
             /** Histogram */
             histogram?: components["schemas"]["LatencyBucket"][];
+            /** Distribution */
+            distribution?: components["schemas"]["LatencyBin"][];
+            /** Daily */
+            daily?: components["schemas"]["LatencyDay"][];
             /**
              * Barge In Count
              * @default 0
@@ -1665,7 +1737,27 @@ export interface components {
             by_model?: components["schemas"]["UsageModelBreakdown"][];
             /** By Api Key */
             by_api_key?: components["schemas"]["UsageApiKeyBreakdown"][];
+            /** By Day */
+            by_day?: components["schemas"]["UsageDayBreakdown"][];
             unattributed: components["schemas"]["UsageUnattributed"];
+            rate: components["schemas"]["UsageRate"];
+        };
+        /**
+         * UsageDayBreakdown
+         * @description One UTC day of one kind of work: what the window looked like, day by
+         *     day, from the same ledger rows the totals add up.
+         */
+        UsageDayBreakdown: {
+            /** Day */
+            day: string;
+            /** Kind */
+            kind: string;
+            /** Calls */
+            calls: number;
+            /** Quantity */
+            quantity: number;
+            /** Spend Cents */
+            spend_cents: number;
         };
         /** UsageHistoryResponse */
         UsageHistoryResponse: {
@@ -1715,6 +1807,19 @@ export interface components {
             model: string;
         };
         /**
+         * UsageRate
+         * @description The one rate card every row above is priced at: timed audio of every
+         *     kind by the minute, a cloned voice once. Sent with the breakdown so a row
+         *     shows the rate it was priced at rather than a per-call average that
+         *     reads as a different price per kind.
+         */
+        UsageRate: {
+            /** Price Per Minute Usd */
+            price_per_minute_usd: number;
+            /** Voice Clone Credits */
+            voice_clone_credits: number;
+        };
+        /**
          * UsageUnattributed
          * @description Work with no API key behind it — the console, and history predating
          *     key attribution. Reported so the key rows always sum to the total.
@@ -1741,6 +1846,55 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /**
+         * VoiceDesignRequest
+         * @description A voice described in words.
+         */
+        VoiceDesignRequest: {
+            /**
+             * Description
+             * @description Who the voice is, in any language: "a calm older man with a deep voice".
+             */
+            description: string;
+            /**
+             * Text
+             * @description What the takes read. Omitted, a line in character is written for them.
+             */
+            text?: string | null;
+            /**
+             * Language
+             * @description The language of the line, such as `en` or `ar`. Omitted, the description's.
+             */
+            language?: string | null;
+        };
+        /** VoiceDesignResponse */
+        VoiceDesignResponse: {
+            /** Instructions */
+            instructions: string;
+            /** Text */
+            text: string;
+            /** Language */
+            language: string | null;
+            /** Name */
+            name: string;
+            /** Takes */
+            takes: components["schemas"]["VoiceDesignTake"][];
+        };
+        /** VoiceDesignTake */
+        VoiceDesignTake: {
+            /** Take Id */
+            take_id: string;
+            /** Audio */
+            audio: string;
+            /**
+             * Content Type
+             * @default audio/wav
+             * @constant
+             */
+            content_type: "audio/wav";
+            /** Seconds */
+            seconds: number;
         };
         /**
          * VoiceIsolation
@@ -1868,7 +2022,6 @@ export type BillingCreditsResponse = components['schemas']['BillingCreditsRespon
 export type BodyCreateTranscriptionV1AudioTranscriptionsPost = components['schemas']['Body_create_transcription_v1_audio_transcriptions_post'];
 export type BodyCreateVoiceV1VoicesPost = components['schemas']['Body_create_voice_v1_voices_post'];
 export type BodySeparateReferenceClipV1VoicesSeparatePost = components['schemas']['Body_separate_reference_clip_v1_voices_separate_post'];
-export type BundleScorecard = components['schemas']['BundleScorecard'];
 export type ClientSecretControl = components['schemas']['ClientSecretControl'];
 export type ClientSecretData = components['schemas']['ClientSecretData'];
 export type ClientSecretExpiry = components['schemas']['ClientSecretExpiry'];
@@ -1884,15 +2037,17 @@ export type FreeTierResponse = components['schemas']['FreeTierResponse'];
 export type GenerationListResponse = components['schemas']['GenerationListResponse'];
 export type GenerationResponse = components['schemas']['GenerationResponse'];
 export type HttpValidationError = components['schemas']['HTTPValidationError'];
-export type InteractionFailure = components['schemas']['InteractionFailure'];
-export type InteractionFailureList = components['schemas']['InteractionFailureList'];
-export type InteractionFailureUpdate = components['schemas']['InteractionFailureUpdate'];
+export type KeepDesignedVoiceRequest = components['schemas']['KeepDesignedVoiceRequest'];
+export type LatencyBin = components['schemas']['LatencyBin'];
 export type LatencyBucket = components['schemas']['LatencyBucket'];
+export type LatencyDay = components['schemas']['LatencyDay'];
 export type ListenerBrief = components['schemas']['ListenerBrief'];
 export type ListenerEvent = components['schemas']['ListenerEvent'];
 export type ListenerEvents = components['schemas']['ListenerEvents'];
 export type ListenerState = components['schemas']['ListenerState'];
 export type OrganizationTurnMetricsSummaryResponse = components['schemas']['OrganizationTurnMetricsSummaryResponse'];
+export type PhoneAdmissionConfiguration = components['schemas']['PhoneAdmissionConfiguration'];
+export type PhoneAdmissionStatus = components['schemas']['PhoneAdmissionStatus'];
 export type PhoneCall = components['schemas']['PhoneCall'];
 export type PhoneCallRequest = components['schemas']['PhoneCallRequest'];
 export type PhoneCallTurn = components['schemas']['PhoneCallTurn'];
@@ -1901,8 +2056,8 @@ export type PhoneNumber = components['schemas']['PhoneNumber'];
 export type PhoneNumberConfirmation = components['schemas']['PhoneNumberConfirmation'];
 export type PhoneNumberList = components['schemas']['PhoneNumberList'];
 export type PhoneNumberRequest = components['schemas']['PhoneNumberRequest'];
+export type PhoneReadiness = components['schemas']['PhoneReadiness'];
 export type RealtimeSessionUsageResponse = components['schemas']['RealtimeSessionUsageResponse'];
-export type ScorecardResponse = components['schemas']['ScorecardResponse'];
 export type SentText = components['schemas']['SentText'];
 export type SeparatedClip = components['schemas']['SeparatedClip'];
 export type SpeechModelInfo = components['schemas']['SpeechModelInfo'];
@@ -1913,11 +2068,16 @@ export type TurnMetricsCoverage = components['schemas']['TurnMetricsCoverage'];
 export type TurnMetricsSummary = components['schemas']['TurnMetricsSummary'];
 export type UsageApiKeyBreakdown = components['schemas']['UsageApiKeyBreakdown'];
 export type UsageBreakdownResponse = components['schemas']['UsageBreakdownResponse'];
+export type UsageDayBreakdown = components['schemas']['UsageDayBreakdown'];
 export type UsageHistoryResponse = components['schemas']['UsageHistoryResponse'];
 export type UsageKindBreakdown = components['schemas']['UsageKindBreakdown'];
 export type UsageModelBreakdown = components['schemas']['UsageModelBreakdown'];
+export type UsageRate = components['schemas']['UsageRate'];
 export type UsageUnattributed = components['schemas']['UsageUnattributed'];
 export type ValidationError = components['schemas']['ValidationError'];
+export type VoiceDesignRequest = components['schemas']['VoiceDesignRequest'];
+export type VoiceDesignResponse = components['schemas']['VoiceDesignResponse'];
+export type VoiceDesignTake = components['schemas']['VoiceDesignTake'];
 export type VoiceIsolation = components['schemas']['VoiceIsolation'];
 export type VoiceIsolationRequest = components['schemas']['VoiceIsolationRequest'];
 export type VoiceResponse = components['schemas']['VoiceResponse'];
@@ -1927,179 +2087,6 @@ export type OpenAiError = components['schemas']['OpenAIError'];
 export type OpenAiErrorResponse = components['schemas']['OpenAIErrorResponse'];
 export type $defs = Record<string, never>;
 export interface operations {
-    list_failures_v1_failures_get: {
-        parameters: {
-            query?: {
-                status?: string | null;
-                signal?: string | null;
-                severity?: string | null;
-                session_id?: string | null;
-                limit?: number;
-                offset?: number;
-            };
-            header?: {
-                authorization?: string | null;
-                "X-API-Key"?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["InteractionFailureList"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_scorecard_v1_failures_scorecard_get: {
-        parameters: {
-            query?: {
-                days?: number;
-            };
-            header?: {
-                authorization?: string | null;
-                "X-API-Key"?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ScorecardResponse"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_failure_v1_failures__failure_id__get: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-                "X-API-Key"?: string | null;
-            };
-            path: {
-                failure_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["InteractionFailure"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_failure_v1_failures__failure_id__patch: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-                "X-API-Key"?: string | null;
-            };
-            path: {
-                failure_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["InteractionFailureUpdate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["InteractionFailure"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     get_api_keys_v1_user_api_keys_get: {
         parameters: {
             query?: {
@@ -2768,6 +2755,92 @@ export interface operations {
             };
         };
     };
+    design_voice_v1_voices_design_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VoiceDesignRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoiceDesignResponse"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpenAIErrorResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    keep_designed_voice_v1_voices_design_keep_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KeepDesignedVoiceRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoiceResponse"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpenAIErrorResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     get_voice_v1_voices__voice_id__get: {
         parameters: {
             query?: never;
@@ -3068,6 +3141,88 @@ export interface operations {
             };
         };
     };
+    phone_readiness_v1_phone_readiness_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneReadiness"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    configure_phone_admission_v1_phone_inbound_admission_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PhoneAdmissionConfiguration"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneAdmissionStatus"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     create_phone_call_v1_phone_calls_post: {
         parameters: {
             query?: never;
@@ -3112,6 +3267,47 @@ export interface operations {
         };
     };
     get_phone_call_v1_phone_calls__call_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path: {
+                call_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneCall"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_phone_call_v1_phone_calls__call_id__delete: {
         parameters: {
             query?: never;
             header?: {

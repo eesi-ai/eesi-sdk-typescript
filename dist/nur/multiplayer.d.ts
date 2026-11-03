@@ -27,6 +27,7 @@ export interface AttributedTurn {
     speaker: number | null;
     /** The player's name, when known. */
     player: string | null;
+    unattributed?: true;
 }
 /** `Speaker N` labels bound to the players sharing one conversation, from introductions and order. */
 export declare class SpeakerRoster {

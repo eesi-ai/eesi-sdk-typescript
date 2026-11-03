@@ -21,7 +21,7 @@ export interface MemoryPolicy {
     /** Search memories for what the player just said, and refresh the recall block. Default true. */
     recallOnTurn?: boolean;
     weights?: RecallWeights;
-    /** Your own extraction model; the default asks nur-llm-v1 with your key. */
+    /** Your own extraction model; the default asks nur-v1 with your key. */
     extractor?: Extractor;
     /** What may be remembered, in your words, for the default extractor: "Only game facts... never age, school, location or social accounts." */
     rules?: string;

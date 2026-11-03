@@ -1,6 +1,6 @@
 // The wire: client events the SDK sends and the server events it reads.
 //
-// Nur Live speaks the OpenAI Realtime protocol plus a few `eesi.*` events
+// Nur speaks the OpenAI Realtime protocol plus a few `eesi.*` events
 // (https://docs.eesi.ai/realtime/live). Builders return plain objects so a
 // trace shows exactly what went out. Server event names have aliases across
 // protocol versions; `canonicalType` collapses them to one name.
@@ -12,11 +12,26 @@ export const OUTPUT_SAMPLE_RATE = 24_000;
 
 /** Limits the gateway enforces on context blocks, tool results and instructions. */
 export const MAX_CONTEXT_KEYS = 8;
-export const MAX_CONTEXT_BLOCK_BYTES = 8_000;
-export const MAX_CONTEXT_TOTAL_BYTES = 24_000;
+export const MAX_CONTEXT_BLOCK_BYTES = 200_000;
+export const MAX_CONTEXT_TOTAL_BYTES = 256_000;
 export const MAX_TOOL_RESULT_BYTES = 16_000;
 export const MAX_INSTRUCTIONS_BYTES = 64_000;
 export const CONTEXT_KEY = /^[a-z0-9][a-z0-9_.-]{0,47}$/;
+
+/**
+ * How the voice says a phrase (`session.replace`): this many phrases at most,
+ * each this long (letters, digits, apostrophes, spaces), said as at most this many characters.
+ */
+export const MAX_PRONUNCIATIONS = 200;
+export const MAX_PRONUNCIATION_PHRASE_CHARS = 100;
+export const MAX_PRONUNCIATION_SPOKEN_CHARS = 128;
+/** Words the transcript should expect (`audio.input.transcription.keyterms`). */
+export const MAX_KEYTERMS = 100;
+export const MAX_KEYTERM_CHARS = 50;
+/** `audio.input.transport` / `audio.output.transport`: base64 in JSON, or binary frames. */
+export const AUDIO_TRANSPORTS = ["json", "binary"] as const;
+/** The longest line a `force_message` says word for word. */
+export const MAX_SCRIPTED_LINE_CHARS = 4_096;
 
 export type ClientEvent = { type: string } & Record<string, unknown>;
 export type ServerEvent = { type: string } & Record<string, unknown>;
@@ -74,6 +89,31 @@ export function userText(text: string, itemId?: string): ClientEvent {
     const item: Record<string, unknown> = { type: "message", role: "user", content: [{ type: "input_text", text }] };
     if (itemId) item.id = itemId;
     return { type: "conversation.item.create", item };
+}
+
+/**
+ * A line the voice says word for word, without the model: it is the turn, so
+ * no `response.create` follows. With `interruptible: false`, nobody can talk over it.
+ */
+export function forceMessage(text: string, options: { interruptible?: boolean; itemId?: string } = {}): ClientEvent {
+    const item: Record<string, unknown> = {
+        type: "force_message",
+        role: "assistant",
+        interruptible: options.interruptible ?? true,
+        content: [{ type: "output_text", text }],
+    };
+    if (options.itemId) item.id = options.itemId;
+    return { type: "conversation.item.create", item };
+}
+
+/** Drop the audio turn detection has not picked up yet. */
+export function clearInputAudio(): ClientEvent {
+    return { type: "input_audio_buffer.clear" };
+}
+
+/** Take an item out of what the character reads next. */
+export function deleteItem(itemId: string): ClientEvent {
+    return { type: "conversation.item.delete", item_id: itemId };
 }
 
 export function toolOutput(callId: string, output: string): ClientEvent {
@@ -175,13 +215,15 @@ export function responseStatus(event: ServerEvent): { status: string | null; rea
 }
 
 const SPEAKER_LINE = /^\s*speaker\s+(\d+)\s*:\s*(.*)$/i;
+const UNATTRIBUTED_LINE = /^\s*unattributed voice\s*:\s*(.*)$/i;
 
 /**
  * `Speaker N:` tagged lines back into `{speaker, text}` runs. An untagged
  * line continues whoever spoke last; a transcript with no tags is one
- * unattributed turn. Nur Live tags lines once a session has heard a second voice.
+ * unlabelled turn. An explicit unknown voice remains distinct from a solo
+ * caller; consumers must not bind it to the previous or only player.
  */
-export function splitSpeakerTurns(text: string): Array<{ speaker: number | null; text: string }> {
+export function splitSpeakerTurns(text: string): Array<{ speaker: number | null; text: string; unattributed?: true }> {
     const trimmed = text.trim();
     if (!trimmed) return [];
     const lines = trimmed.split("\n");
@@ -191,9 +233,15 @@ export function splitSpeakerTurns(text: string): Array<{ speaker: number | null;
         const n = Number(match[1]);
         return Number.isSafeInteger(n) && n >= 1 ? n : null;
     };
-    if (!lines.some((line) => speakerOf(line) !== null)) return [{ speaker: null, text: trimmed }];
-    const turns: Array<{ speaker: number | null; text: string }> = [];
+    if (!lines.some((line) => speakerOf(line) !== null || UNATTRIBUTED_LINE.test(line))) return [{ speaker: null, text: trimmed }];
+    const turns: Array<{ speaker: number | null; text: string; unattributed?: true }> = [];
     for (const line of lines) {
+        const unknown = UNATTRIBUTED_LINE.exec(line);
+        if (unknown) {
+            // Separate unknown runs need not be the same person.
+            turns.push({ speaker: null, text: (unknown[1] ?? "").trim(), unattributed: true });
+            continue;
+        }
         const speaker = speakerOf(line);
         const match = SPEAKER_LINE.exec(line);
         if (speaker !== null && match) {

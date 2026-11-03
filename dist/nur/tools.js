@@ -124,7 +124,7 @@ export class ToolRunner {
         return false;
     }
     /** Answer one call. Never throws. */
-    async run(callId, name, rawArguments) {
+    async run(callId, name, rawArguments, context = this.context) {
         const startedAt = Date.now();
         let args;
         try {
@@ -155,7 +155,7 @@ export class ToolRunner {
                 return this.fail(callId, name, args, "invalid_arguments", `The arguments were not valid: ${message(error)}.`);
             }
         }
-        const ctx = this.context(callId, args);
+        const ctx = context(callId, args);
         if (definition.allow) {
             let verdict;
             try {

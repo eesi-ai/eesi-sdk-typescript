@@ -4,11 +4,25 @@ export declare const INPUT_SAMPLE_RATE = 16000;
 export declare const OUTPUT_SAMPLE_RATE = 24000;
 /** Limits the gateway enforces on context blocks, tool results and instructions. */
 export declare const MAX_CONTEXT_KEYS = 8;
-export declare const MAX_CONTEXT_BLOCK_BYTES = 8000;
-export declare const MAX_CONTEXT_TOTAL_BYTES = 24000;
+export declare const MAX_CONTEXT_BLOCK_BYTES = 200000;
+export declare const MAX_CONTEXT_TOTAL_BYTES = 256000;
 export declare const MAX_TOOL_RESULT_BYTES = 16000;
 export declare const MAX_INSTRUCTIONS_BYTES = 64000;
 export declare const CONTEXT_KEY: RegExp;
+/**
+ * How the voice says a phrase (`session.replace`): this many phrases at most,
+ * each this long (letters, digits, apostrophes, spaces), said as at most this many characters.
+ */
+export declare const MAX_PRONUNCIATIONS = 200;
+export declare const MAX_PRONUNCIATION_PHRASE_CHARS = 100;
+export declare const MAX_PRONUNCIATION_SPOKEN_CHARS = 128;
+/** Words the transcript should expect (`audio.input.transcription.keyterms`). */
+export declare const MAX_KEYTERMS = 100;
+export declare const MAX_KEYTERM_CHARS = 50;
+/** `audio.input.transport` / `audio.output.transport`: base64 in JSON, or binary frames. */
+export declare const AUDIO_TRANSPORTS: readonly ["json", "binary"];
+/** The longest line a `force_message` says word for word. */
+export declare const MAX_SCRIPTED_LINE_CHARS = 4096;
 export type ClientEvent = {
     type: string;
 } & Record<string, unknown>;
@@ -28,6 +42,18 @@ export declare function sessionUpdate(session: Record<string, unknown>): ClientE
 export declare function contextUpdate(key: string, text: string): ClientEvent;
 export declare function appendAudio(base64: string): ClientEvent;
 export declare function userText(text: string, itemId?: string): ClientEvent;
+/**
+ * A line the voice says word for word, without the model: it is the turn, so
+ * no `response.create` follows. With `interruptible: false`, nobody can talk over it.
+ */
+export declare function forceMessage(text: string, options?: {
+    interruptible?: boolean;
+    itemId?: string;
+}): ClientEvent;
+/** Drop the audio turn detection has not picked up yet. */
+export declare function clearInputAudio(): ClientEvent;
+/** Take an item out of what the character reads next. */
+export declare function deleteItem(itemId: string): ClientEvent;
 export declare function toolOutput(callId: string, output: string): ClientEvent;
 /**
  * A reply. `instructions` steer this one reply; the character still stands,
@@ -72,11 +98,13 @@ export declare function responseStatus(event: ServerEvent): {
 /**
  * `Speaker N:` tagged lines back into `{speaker, text}` runs. An untagged
  * line continues whoever spoke last; a transcript with no tags is one
- * unattributed turn. Nur Live tags lines once a session has heard a second voice.
+ * unlabelled turn. An explicit unknown voice remains distinct from a solo
+ * caller; consumers must not bind it to the previous or only player.
  */
 export declare function splitSpeakerTurns(text: string): Array<{
     speaker: number | null;
     text: string;
+    unattributed?: true;
 }>;
 export declare function byteLength(text: string): number;
 /** `text` cut to at most `limit` UTF-8 bytes on a character boundary, marked with an ellipsis. */

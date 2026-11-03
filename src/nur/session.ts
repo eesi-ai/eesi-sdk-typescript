@@ -5,9 +5,9 @@
 //     const reply = await session.ask("Who goes there?");
 //     await session.close();
 //
-// A session is an ordinary Nur Live realtime connection, so authentication,
+// A session is an ordinary Nur realtime connection, so authentication,
 // metering, recording consent and organization scope stay at the gateway.
-// Nur Live owns the conversation itself: voice activity, turn-taking,
+// Nur owns the conversation itself: voice activity, turn-taking,
 // interruptions, backchannels, history and cancellation. The session owns
 // what your application knows: the character, live context, memory, tools
 // and the audio on this side.
@@ -25,16 +25,19 @@ import { AuthenticationError, ConfigurationError, ContextError, NurError, Realti
 import {
     type AnyEventInit,
     EventBus,
+    type EventInit,
     type EventOf,
     type EventPattern,
     type Handler,
     type Logger,
     type NurEvent,
     type ResponseCompleted,
+    type ResponseContext,
     type SpeakerTurn,
 } from "./events.js";
 import { Initiative, type Moment, momentInstructions } from "./initiative.js";
 import { describeLanguage } from "./languages.js";
+import { McpEvents, type McpServer, toolPatch } from "./mcp.js";
 import type { CharacterMemory, MemoryRecord, PlayerMemory, RememberOptions } from "./memory/index.js";
 import { type AttributedTurn, asPlayers, type PartyLog, type Player, playerKey, SpeakerRoster } from "./multiplayer.js";
 import { IDLE_SKIP, idlePrompt, type Proactive, type State, Trigger, type TriggerOptions } from "./proactive.js";
@@ -60,6 +63,47 @@ const RECALL_MAX = 3;
 const IDLE_POLL_MS = 1_000;
 /** Marks the SDK's own out-of-band requests, which are never shown as replies. */
 const INTERNAL_TAG = "eesi_sdk";
+const MAX_RECEIPT_RESPONSES = 2_048;
+
+function receiptLabel(value: unknown): value is string {
+    return typeof value === "string" && value.length > 0 && value.length <= 256 && value === value.trim() && !/[\p{C}\p{Z}]/u.test(value.replaceAll(" ", ""));
+}
+
+function receiptInteger(value: unknown): value is number {
+    return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+}
+
+/** Keep only bounded receipt metadata, never arbitrary provider or prompt fields. */
+function responseContext(event: wire.ServerEvent): EventInit<ResponseContext> | null {
+    if (event.type !== "eesi.response_context" || event.schema_version !== 1 || event.status !== "provider_started" || !receiptLabel(event.response_id)) return null;
+    if (!event.receipt || typeof event.receipt !== "object" || Array.isArray(event.receipt)) return null;
+    const receipt = event.receipt as Record<string, unknown>;
+    const turnId = event.turn_id ?? null;
+    const turnRevision = event.turn_revision ?? null;
+    if (
+        receipt.coverage !== "serialized_provider_input" ||
+        !receiptLabel(receipt.receipt_id) ||
+        !receiptLabel(receipt.model) ||
+        typeof receipt.input_sha256 !== "string" ||
+        !/^[a-f0-9]{64}$/.test(receipt.input_sha256) ||
+        (receipt.provider_format !== "chat_completions" && receipt.provider_format !== "responses") ||
+        !receiptInteger(receipt.item_count) ||
+        (turnId !== null && !receiptLabel(turnId)) ||
+        (turnRevision !== null && !receiptInteger(turnRevision))
+    ) return null;
+    return {
+        type: "response.context",
+        responseId: event.response_id,
+        receiptId: receipt.receipt_id,
+        inputSha256: receipt.input_sha256,
+        providerFormat: receipt.provider_format,
+        model: receipt.model,
+        itemCount: receipt.item_count,
+        coverage: receipt.coverage,
+        turnId,
+        turnRevision,
+    };
+}
 
 /** The parts of a WebSocket a session uses: the browser's, Node's (22+), Deno's, Bun's, or the `ws` package's. */
 export interface WebSocketLike {
@@ -99,6 +143,8 @@ export interface SessionHost {
     readonly proactive: Proactive | null;
     readonly triggers: Trigger[];
     readonly tools: Array<AnyTool>;
+    /** Remote MCP servers EESI runs; a joined session's host has none. */
+    readonly mcpServers?: McpServer[];
     readonly context: LiveContext;
     readonly memory: CharacterMemory | null;
     readonly party: PartyLog | null;
@@ -194,6 +240,8 @@ export function summarizeMetrics(metrics: SessionMetrics): MetricsSummary {
 }
 
 interface Reply {
+    unattributed: boolean;
+    playerId: string | null;
     deltas: string[];
     segments: string[];
     segmentIds: Set<string>;
@@ -210,6 +258,8 @@ interface Reply {
 
 function newReply(): Reply {
     return {
+        unattributed: false,
+        playerId: null,
         deltas: [],
         segments: [],
         segmentIds: new Set(),
@@ -347,6 +397,10 @@ export class Session {
     };
     /** `[speaker, text]` lines as the SDK saw them: "player", a player's name, "event" or the character's name. */
     readonly transcript: Array<[string, string]> = [];
+    private readonly unlearnableLines = new Set<number>();
+    private lastInputUnattributed = false;
+    private inputSequence = 0;
+    private audioInput: { itemId: string | null; sequence: number } | null = null;
     /** The language this session is pinned to, when it is: a code or a name. */
     readonly language: string | null;
     /** This player's memories with the character, when the session has them. */
@@ -383,6 +437,7 @@ export class Session {
     private readonly options: SessionOptions;
     private readonly trace: Trace | null;
     private readonly tools: ToolRunner;
+    private readonly mcp = new McpEvents();
     private readonly triggers: Trigger[];
     private readonly initiative: Initiative;
     private readonly memoryMode: "off" | "read" | "read_write";
@@ -414,6 +469,9 @@ export class Session {
     private current: string | null = null;
     private cancelled: string[] = [];
     private active = new Set<string>();
+    /** Receipt eligibility on this connection; terminal IDs survive reply pruning. */
+    private receiptResponses = new Map<string, boolean>();
+    private receiptResponsesFull = false;
     private pendingContinue = new Set<string>();
     private interruptedIds = new Set<string>();
     private itemWaiters = new Map<string, () => void>();
@@ -685,14 +743,16 @@ export class Session {
     /** Type into the conversation as the player and, unless `respond: false`, ask for a reply. */
     async sendText(text: string, options: { respond?: boolean; itemId?: string } = {}): Promise<void> {
         this.requireLive();
+        this.inputSequence += 1;
         this.transcript.push(["player", text]);
+        this.lastInputUnattributed = false;
         this.lastPlayer = this.playerId;
         if (this.host.party) {
             this.host.party.heard(this.nameOf(this.playerId) ?? "A player", text, this.origin);
             this.refreshPartyBlocks();
         }
         this.send(wire.userText(text, options.itemId));
-        if ((options.respond ?? true) && this.host.turnTaking !== "director") this.send(wire.responseCreate());
+        if ((options.respond ?? true) && this.host.turnTaking !== "director") await this.respond();
     }
 
     /**
@@ -757,11 +817,15 @@ export class Session {
     /** Ask the character to speak now, optionally steered for this one reply. A reply already under way finishes first. */
     async respond(instructions?: string): Promise<void> {
         this.requireLive();
+        await this.publisher.flush();
+        this.requireLive();
         this.send(wire.responseCreate({ instructions }));
     }
 
     /** Have the character say `line`, as nearly verbatim as the model allows, in its own voice. */
     async say(line: string): Promise<void> {
+        this.requireLive();
+        await this.publisher.flush();
         this.requireLive();
         this.send(wire.responseCreate({ instructions: `Say exactly this, in character and in your own voice, and nothing else: "${line}"` }));
     }
@@ -860,14 +924,23 @@ export class Session {
     async setToolEnabled(name: string, enabled: boolean): Promise<void> {
         if (enabled) this.tools.disabled.delete(name);
         else this.tools.disabled.add(name);
-        const specs = this.tools.specs();
-        await this.updateSession({ tools: specs, tool_choice: specs.length ? "auto" : "none" });
+        await this.updateSession(toolPatch(this.tools.specs(), this.host.mcpServers ?? []));
     }
 
     /** @internal A tool registered on the character while this session runs. */
     addTool(item: AnyTool): void {
         this.tools.tools.set(item.name, item);
-        if (this.isReady && this.transport.kind !== "joined") void this.updateSession({ tools: this.tools.specs(), tool_choice: "auto" });
+        if (this.isReady && this.transport.kind !== "joined") void this.updateSession(toolPatch(this.tools.specs(), this.host.mcpServers ?? []));
+    }
+
+    /**
+     * Answer an `mcp.approval.requested` with the player's yes (or no). The
+     * character asked out loud too, and a spoken yes works without this. A tool
+     * runs at most once per yes, with the arguments it asked about.
+     */
+    approveMcp(requestId: string, approve = true): void {
+        this.requireLive();
+        this.send({ type: "conversation.item.create", item: { type: "mcp_approval_response", approval_request_id: requestId, approve } });
     }
 
     /** @internal A trigger registered on the character while this session runs. */
@@ -1001,7 +1074,11 @@ export class Session {
                 this.publisher.stop();
                 this.dropAudio();
                 // Events already received are handled before deciding what the close means.
-                void this.chain.then(() => resolve({ code: event.code ?? 1006, reason: event.reason ?? "", opened }));
+                void this.chain.then(() => {
+                    this.receiptResponses.clear();
+                    this.receiptResponsesFull = false;
+                    resolve({ code: event.code ?? 1006, reason: event.reason ?? "", opened });
+                });
             };
         });
     }
@@ -1115,6 +1192,7 @@ export class Session {
         const audible = this.audible();
         this.dropAudio();
         if (rid) {
+            this.trackReceiptResponse(rid, false);
             if (!this.cancelled.includes(rid)) {
                 this.cancelled.push(rid);
                 if (this.cancelled.length > 64) this.cancelled.shift();
@@ -1135,14 +1213,28 @@ export class Session {
         let reply = this.replies.get(rid);
         if (!reply) {
             reply = newReply();
+            reply.unattributed = this.lastInputUnattributed;
+            reply.playerId = reply.unattributed ? null : this.lastPlayer;
             this.replies.set(rid, reply);
         }
         return reply;
     }
 
+    private trackReceiptResponse(rid: string, eligible: boolean): void {
+        if (this.receiptResponsesFull || !receiptLabel(rid)) return;
+        if (!this.receiptResponses.has(rid) && this.receiptResponses.size >= MAX_RECEIPT_RESPONSES) {
+            // Do not evict terminal IDs and accidentally authorize their replay.
+            this.receiptResponsesFull = true;
+            return;
+        }
+        if (this.receiptResponses.get(rid) !== false) this.receiptResponses.set(rid, eligible);
+    }
+
     private async handle(event: wire.ServerEvent): Promise<void> {
         const kind = wire.canonicalType(event.type);
         const now = Date.now();
+        // Remote MCP servers EESI runs: watched, never answered here.
+        for (const mcpEvent of this.mcp.read(kind, event)) this.emit(mcpEvent);
         switch (kind) {
             case "eesi.recording_disclosure": {
                 const disclosure = wire.record(event.disclosure);
@@ -1213,8 +1305,21 @@ export class Session {
             }
             case "conversation.item.input_audio_transcription.completed": {
                 this.partial = "";
+                const itemId = wire.str(event.item_id) || null;
+                const ownsInput = this.audioOwnsInput(itemId);
                 const text = wire.str(event.transcript).trim();
-                if (text) this.onUserTurn(text, wire.str(event.item_id) || null);
+                if (text) this.onUserTurn(text, itemId, ownsInput);
+                else if (ownsInput) {
+                    this.lastInputUnattributed = true;
+                    this.lastPlayer = null;
+                }
+                return;
+            }
+            case "conversation.item.input_audio_transcription.failed": {
+                if (this.audioOwnsInput(wire.str(event.item_id) || null)) {
+                    this.lastInputUnattributed = true;
+                    this.lastPlayer = null;
+                }
                 return;
             }
             case "conversation.item.added":
@@ -1224,11 +1329,13 @@ export class Session {
             case "response.created": {
                 const rid = wire.responseIdOf(event);
                 if (this.isInternal(event)) {
+                    this.trackReceiptResponse(rid, false);
                     this.internal.set(rid, []);
                     return;
                 }
                 this.lastActivity = now;
                 const reply = this.reply(rid);
+                if (!reply.done && !reply.cancelled && !this.cancelled.includes(rid)) this.trackReceiptResponse(rid, true);
                 reply.turnEndedAt = this.speechStoppedAt;
                 this.speechStoppedAt = null;
                 this.current = rid;
@@ -1239,6 +1346,14 @@ export class Session {
             }
             case "response.output_audio.delta":
                 return this.onAudio(event);
+            case "eesi.response_context": {
+                const context = responseContext(event);
+                if (!context || this.closing || this.receiptResponsesFull || this.receiptResponses.get(context.responseId) !== true || this.internal.has(context.responseId) || this.cancelled.includes(context.responseId)) return;
+                const reply = this.replies.get(context.responseId);
+                if (!reply || reply.done || reply.cancelled) return;
+                this.emit(context);
+                return;
+            }
             case "response.output_audio_transcript.delta":
             case "response.output_text.delta": {
                 const rid = wire.responseIdOf(event) || this.current || "";
@@ -1345,6 +1460,14 @@ export class Session {
     }
 
     private onSpeechStarted(event: wire.ServerEvent): void {
+        const itemId = wire.str(event.item_id) || null;
+        // Reopened speech can reuse an item ID. Even an ambiguous hard-cut
+        // notification must not let future replies borrow the preceding voice.
+        // Existing replies keep their own immutable ownership snapshots.
+        this.inputSequence += 1;
+        this.audioInput = { itemId, sequence: this.inputSequence };
+        this.lastInputUnattributed = true;
+        this.lastPlayer = null;
         const interrupt = event.interrupt_response;
         const audible = this.audible();
         this.userSpeaking = true;
@@ -1364,26 +1487,36 @@ export class Session {
         if (interrupt !== false && !event.eesi_late && (audible || (this.current !== null && this.active.has(this.current)))) this.cut(this.current);
     }
 
-    private onUserTurn(text: string, itemId: string | null): void {
+    private audioOwnsInput(itemId: string | null): boolean {
+        // Without a speech-start (e.g. an attached control stream), retain the
+        // ordinary final-transcript path. Once audio is tracked, require its
+        // exact item: an older final must not replace newer audio or typed input.
+        return this.audioInput === null || (this.audioInput.itemId === itemId && this.audioInput.sequence === this.inputSequence);
+    }
+
+    private onUserTurn(text: string, itemId: string | null, ownsInput = true): void {
         this.metrics.turns += 1;
         let turns: SpeakerTurn[];
         if (this.attributor || this.roster) {
             const attributed = this.attributor ? this.attributor(text) : (this.roster as SpeakerRoster).attribute(text);
-            turns = attributed.map((turn) => ({ text: turn.text, speaker: turn.speaker, playerId: turn.player ? (this.playerIds[turn.player] ?? turn.player) : null }));
-            for (const turn of turns) if (turn.playerId) this.lastPlayer = turn.playerId;
+            turns = attributed.map((turn) => ({ text: turn.text, speaker: turn.unattributed ? null : turn.speaker, playerId: turn.unattributed ? null : turn.player ? (this.playerIds[turn.player] ?? turn.player) : null, ...(turn.unattributed ? { unattributed: true as const } : {}) }));
             if (this.roster) this.publisher.setBlock("roster", this.roster.render(this.languages));
         } else {
-            turns = wire.splitSpeakerTurns(text).map(({ speaker, text: words }) => ({ text: words, speaker, playerId: this.playerId }));
+            turns = wire.splitSpeakerTurns(text).map(({ speaker, text: words, unattributed }) => ({ text: words, speaker, playerId: unattributed ? null : this.playerId, ...(unattributed ? { unattributed: true as const } : {}) }));
         }
+        if (ownsInput) this.lastInputUnattributed = turns.some((turn) => turn.unattributed);
         for (const turn of turns) {
-            const label = this.players.length ? (this.nameOf(turn.playerId) ?? (turn.speaker ? `Speaker ${turn.speaker}` : "player")) : "player";
+            if (ownsInput && (turn.unattributed || turn.playerId)) this.lastPlayer = turn.playerId;
+            const label = turn.unattributed ? "Unattributed voice" : this.players.length ? (this.nameOf(turn.playerId) ?? (turn.speaker ? `Speaker ${turn.speaker}` : "player")) : "player";
+            if (turn.unattributed) this.unlearnableLines.add(this.transcript.length);
             this.transcript.push([label, turn.text]);
-            this.host.party?.heard(this.nameOf(turn.playerId) ?? "A player", turn.text, this.origin);
+            this.host.party?.heard(turn.unattributed ? "Unattributed voice" : this.nameOf(turn.playerId) ?? "A player", turn.text, this.origin);
         }
         if (this.host.party) this.refreshPartyBlocks();
         this.emit({ type: "transcript.final", text, itemId, turns });
-        if (this.host.memory && this.host.memory.policy.recallOnTurn && this.memoryMode !== "off" && !this.memoryTask) {
-            this.memoryTask = this.recallFor(text)
+        const recallText = turns.filter((turn) => !turn.unattributed).map((turn) => turn.text).join("\n");
+        if (recallText && this.host.memory && this.host.memory.policy.recallOnTurn && this.memoryMode !== "off" && !this.memoryTask) {
+            this.memoryTask = this.recallFor(recallText)
                 .catch((error: unknown) => this.logger.warn("memory recall failed", error))
                 .finally(() => {
                     this.memoryTask = null;
@@ -1413,6 +1546,7 @@ export class Session {
         const { status, reason } = wire.responseStatus(event);
         this.lastActivity = Date.now();
         const reply = this.reply(rid);
+        this.trackReceiptResponse(rid, false);
         this.active.delete(rid);
         reply.done = true;
         const cut = status === "cancelled" || reason === "turn_detected";
@@ -1428,9 +1562,10 @@ export class Session {
             this.emit({ type: "error", message: `The reply ended with status ${status}${reason ? ` (${reason})` : ""}.`, code: reason ?? status });
         }
         if (text) {
+            if (reply.unattributed) this.unlearnableLines.add(this.transcript.length);
             this.transcript.push([this.host.name, text + (cut ? " [cut off]" : "")]);
             if (this.host.party && !cut) {
-                this.host.party.said(this.host.name, this.nameOf(this.lastPlayer) ?? "a player", text, this.origin);
+                this.host.party.said(this.host.name, reply.unattributed ? "Unattributed voice" : this.nameOf(reply.playerId) ?? "a player", text, this.origin);
                 this.refreshPartyBlocks();
             }
         }
@@ -1451,8 +1586,8 @@ export class Session {
         return playerId;
     }
 
-    private toolContext(callId: string, args: Record<string, unknown>): ToolContext {
-        return { session: this, character: this.character, playerId: this.lastPlayer ?? this.playerId, callId, arguments: args };
+    private toolContext(callId: string, args: Record<string, unknown>, playerId: string | null = this.lastPlayer): ToolContext {
+        return { session: this, character: this.character, playerId, callId, arguments: args };
     }
 
     private toolEvent(event: ToolEvent): void {
@@ -1482,8 +1617,14 @@ export class Session {
     }
 
     private async runTool(rid: string, callId: string, name: string, args: string): Promise<void> {
+        // The response owns this call even if another person has spoken while
+        // its arguments were streaming. Capture the owner through authorization
+        // awaits and the tool body without reading later session state.
+        const playerId = this.replies.get(rid)?.playerId ?? null;
         const forward = this.options.onToolCall;
-        const outcome = forward && !this.tools.tools.has(name) ? await this.forwardTool(forward, callId, name, args) : await this.tools.run(callId, name, args);
+        const outcome = forward && !this.tools.tools.has(name)
+            ? await this.forwardTool(forward, callId, name, args, playerId)
+            : await this.tools.run(callId, name, args, (id, values) => this.toolContext(id, values, playerId));
         if (outcome.later) this.follow(name, outcome.later);
         this.send(wire.toolOutput(callId, outcome.output));
         const reply = this.replies.get(rid);
@@ -1494,7 +1635,7 @@ export class Session {
     }
 
     /** A joined client's call, answered by your code (which usually asks your server: `character.runTool`). */
-    private async forwardTool(forward: (call: ToolCall) => unknown, callId: string, name: string, raw: string): Promise<Outcome> {
+    private async forwardTool(forward: (call: ToolCall) => unknown, callId: string, name: string, raw: string, playerId: string | null): Promise<Outcome> {
         let args: Record<string, unknown> = {};
         try {
             const parsed: unknown = raw.trim() ? JSON.parse(raw) : {};
@@ -1507,7 +1648,7 @@ export class Session {
         let timer: ReturnType<typeof setTimeout> | undefined;
         try {
             const result = await Promise.race([
-                Promise.resolve().then(() => forward({ name, arguments: args, callId, playerId: this.lastPlayer ?? this.playerId })),
+                Promise.resolve().then(() => forward({ name, arguments: args, callId, playerId })),
                 new Promise<never>((_, reject) => {
                     timer = setTimeout(() => reject(new Error(`no answer within ${FORWARDED_TOOL_TIMEOUT_MS / 1000} s`)), FORWARDED_TOOL_TIMEOUT_MS);
                 }),
@@ -1645,7 +1786,12 @@ export class Session {
     // ── context and memory ────────────────────────────────────────────────
 
     private async sendContext(key: string, text: string): Promise<void> {
-        this.send(wire.contextUpdate(key, text));
+        // The publisher marks a block sent only after this resolves. A failed
+        // context frame must stop an explicit reply instead of leaving it
+        // composed against stale state; ordinary events remain best effort.
+        const ws = this.ws;
+        if (!ws || ws.readyState !== 1) throw new RealtimeConnectionError("Cannot publish context while the realtime connection is not open.", { kind: "unavailable" });
+        ws.send(JSON.stringify(wire.contextUpdate(key, text)));
     }
 
     /** @internal */
@@ -1713,11 +1859,12 @@ export class Session {
     private async learn(): Promise<void> {
         const memory = this.host.memory;
         if (!memory || !this.memoryWritable || !memory.policy.extract) return;
-        if (!this.transcript.some(([speaker]) => speaker !== "event" && speaker !== this.host.name)) return;
+        const learnable = this.transcript.filter((_, index) => !this.unlearnableLines.has(index));
+        if (!learnable.some(([speaker]) => speaker !== "event" && speaker !== this.host.name)) return;
         const targets: Array<[string, string | null]> = this.playerId ? [[this.playerId, this.playerName]] : this.players.map((player) => [playerKey(player), player.name]);
         for (const [playerId, name] of targets) {
             // Each player's memories come from their own words; the others' are context.
-            const lines: Array<[string, string]> = this.transcript.map(([speaker, text]) => [speaker === "player" || speaker === name ? "player" : speaker, text]);
+            const lines: Array<[string, string]> = learnable.map(([speaker, text]) => [speaker === "player" || speaker === name ? "player" : speaker, text]);
             let timer: ReturnType<typeof setTimeout> | undefined;
             try {
                 const result = await Promise.race([

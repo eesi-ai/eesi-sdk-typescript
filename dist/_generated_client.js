@@ -13,9 +13,17 @@ export class _GeneratedClient {
     async archiveApiKey(apiKeyId) {
         return this.request("DELETE", `/user/api-keys/${apiKeyId}`);
     }
+    /** Cancel a durable call and fence a delayed dial with the same request ID. */
+    async cancelPhoneCall(callId) {
+        return this.request("DELETE", `/phone/calls/${callId}`);
+    }
     /** Chat completions. `body` is an OpenAI chat-completions request and is forwarded verbatim; the parsed completion is returned. Streaming (`stream: true`) is not supported by this method — use an OpenAI client for that. */
     async chatCompletions(opts) {
         return this.request("POST", "/chat/completions", { json: opts.body });
+    }
+    /** Configure a signed admission callback for an owned, active inbound number. */
+    async configurePhoneAdmission(opts) {
+        return this.request("PUT", "/phone/inbound-admission", { json: opts.body });
     }
     /** Enter the code sent to the number; it is confirmed for Nur's calls and texts. */
     async confirmPhoneNumber(opts) {
@@ -51,6 +59,8 @@ export class _GeneratedClient {
                 form.append("timestamp_granularities[]", String(v));
         if (opts.stream !== undefined)
             form.append("stream", String(opts.stream));
+        if (opts.store !== undefined)
+            form.append("store", String(opts.store));
         return this.request("POST", "/audio/transcriptions", { form });
     }
     /** Clone a voice from 3-10 seconds of reference audio. */
@@ -82,6 +92,10 @@ export class _GeneratedClient {
     async deleteVoice(voiceId) {
         return this.request("DELETE", `/voices/${voiceId}`);
     }
+    /** Three takes of a voice described in words, to keep one. */
+    async designVoice(opts) {
+        return this.request("POST", "/voices/design", { json: opts.body });
+    }
     /** Stop Nur's calls to a number on the shared line until it is confirmed again. */
     async forgetPhoneNumber(number) {
         return this.request("DELETE", `/phone/numbers/${number}`);
@@ -111,17 +125,6 @@ export class _GeneratedClient {
             ...(opts.days !== undefined ? { "days": opts.days } : {}),
         };
         return this.request("GET", "/organizations/usage/daily-breakdown", { params });
-    }
-    /** One interaction failure. */
-    async getFailure(failureId) {
-        return this.request("GET", `/failures/${failureId}`);
-    }
-    /** Per runtime bundle: sessions, how they ended, evidence coverage, reply latency and failures — the scorecard a release is judged by. */
-    async getFailureScorecard(opts = {}) {
-        const params = {
-            ...(opts.days !== undefined ? { "days": opts.days } : {}),
-        };
-        return this.request("GET", "/failures/scorecard", { params });
     }
     /** Organization-wide per-turn latency summary over an optional day window. */
     async getOrganizationTurnMetricsSummary(opts = {}) {
@@ -159,17 +162,9 @@ export class _GeneratedClient {
     async getVoiceIsolation(voiceId) {
         return this.request("GET", `/voices/${voiceId}/isolation`);
     }
-    /** Interaction failures raised from this organization's sessions, ranked by severity × confidence. */
-    async listFailures(opts = {}) {
-        const params = {
-            ...(opts.status !== undefined ? { "status": opts.status } : {}),
-            ...(opts.signal !== undefined ? { "signal": opts.signal } : {}),
-            ...(opts.severity !== undefined ? { "severity": opts.severity } : {}),
-            ...(opts.sessionId !== undefined ? { "session_id": opts.sessionId } : {}),
-            ...(opts.limit !== undefined ? { "limit": opts.limit } : {}),
-            ...(opts.offset !== undefined ? { "offset": opts.offset } : {}),
-        };
-        return this.request("GET", "/failures", { params });
+    /** Make one take of a designed voice a voice of your own. */
+    async keepDesignedVoice(opts) {
+        return this.request("POST", "/voices/design/keep", { json: opts.body });
     }
     /** List past text-to-speech generations. */
     async listGenerations(opts = {}) {
@@ -200,6 +195,10 @@ export class _GeneratedClient {
         };
         return this.request("GET", "/phone/listener/events", { params });
     }
+    /** Check the organization's configured phone capabilities without placing a call. */
+    async phoneReadiness() {
+        return this.request("GET", "/phone/readiness");
+    }
     /** Brief the code line: what a call about your code should know. Publish again before it expires; calls to the code line use the latest. */
     async publishPhoneListener(opts) {
         return this.request("PUT", "/phone/listener", { json: opts.body });
@@ -217,10 +216,6 @@ export class _GeneratedClient {
     /** Speak from the recording, or from the voice isolated out of it. */
     async setVoiceIsolation(voiceId, opts) {
         return this.request("POST", `/voices/${voiceId}/isolation`, { json: opts.body });
-    }
-    /** Move a failure through triage (status) and record what was found (notes). */
-    async updateFailure(failureId, opts) {
-        return this.request("PATCH", `/failures/${failureId}`, { json: opts.body });
     }
     /** Rename a cloned voice. */
     async updateVoice(voiceId, opts) {

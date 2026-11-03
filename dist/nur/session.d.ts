@@ -3,6 +3,7 @@ import type { Character, ConnectOptions } from "./character.js";
 import { ContextPublisher, LiveContext } from "./context.js";
 import { type AnyEventInit, EventBus, type EventOf, type EventPattern, type Handler, type Logger, type NurEvent, type ResponseCompleted } from "./events.js";
 import { type Moment } from "./initiative.js";
+import { type McpServer } from "./mcp.js";
 import type { CharacterMemory, MemoryRecord, PlayerMemory, RememberOptions } from "./memory/index.js";
 import { type AttributedTurn, type PartyLog, type Player, SpeakerRoster } from "./multiplayer.js";
 import { type Proactive, type State, Trigger, type TriggerOptions } from "./proactive.js";
@@ -40,6 +41,8 @@ export interface SessionHost {
     readonly proactive: Proactive | null;
     readonly triggers: Trigger[];
     readonly tools: Array<AnyTool>;
+    /** Remote MCP servers EESI runs; a joined session's host has none. */
+    readonly mcpServers?: McpServer[];
     readonly context: LiveContext;
     readonly memory: CharacterMemory | null;
     readonly party: PartyLog | null;
@@ -145,6 +148,10 @@ export declare class Session {
     readonly metrics: SessionMetrics;
     /** `[speaker, text]` lines as the SDK saw them: "player", a player's name, "event" or the character's name. */
     readonly transcript: Array<[string, string]>;
+    private readonly unlearnableLines;
+    private lastInputUnattributed;
+    private inputSequence;
+    private audioInput;
     /** The language this session is pinned to, when it is: a code or a name. */
     readonly language: string | null;
     /** This player's memories with the character, when the session has them. */
@@ -179,6 +186,7 @@ export declare class Session {
     private readonly options;
     private readonly trace;
     private readonly tools;
+    private readonly mcp;
     private readonly triggers;
     private readonly initiative;
     private readonly memoryMode;
@@ -210,6 +218,9 @@ export declare class Session {
     private current;
     private cancelled;
     private active;
+    /** Receipt eligibility on this connection; terminal IDs survive reply pruning. */
+    private receiptResponses;
+    private receiptResponsesFull;
     private pendingContinue;
     private interruptedIds;
     private itemWaiters;
@@ -336,6 +347,12 @@ export declare class Session {
     setToolEnabled(name: string, enabled: boolean): Promise<void>;
     /** @internal A tool registered on the character while this session runs. */
     addTool(item: AnyTool): void;
+    /**
+     * Answer an `mcp.approval.requested` with the player's yes (or no). The
+     * character asked out loud too, and a spoken yes works without this. A tool
+     * runs at most once per yes, with the arguments it asked about.
+     */
+    approveMcp(requestId: string, approve?: boolean): void;
     /** @internal A trigger registered on the character while this session runs. */
     addTrigger(trigger: Trigger): void;
     /**
@@ -360,11 +377,13 @@ export declare class Session {
     private dropAudio;
     private cut;
     private reply;
+    private trackReceiptResponse;
     private handle;
     private onSessionHandle;
     private onReady;
     private greetingText;
     private onSpeechStarted;
+    private audioOwnsInput;
     private onUserTurn;
     /** App turn-taking: one reply per finished turn, once fresh state and memories are in. */
     private replyToTurn;

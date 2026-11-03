@@ -17,26 +17,28 @@ import type {
     CurrentUsageResponse,
     DailyUsageBreakdownResponse,
     GenerationListResponse,
-    InteractionFailure,
-    InteractionFailureList,
-    InteractionFailureUpdate,
+    KeepDesignedVoiceRequest,
     ListenerBrief,
     ListenerEvents,
     ListenerState,
     OrganizationTurnMetricsSummaryResponse,
+    PhoneAdmissionConfiguration,
+    PhoneAdmissionStatus,
     PhoneCall,
     PhoneCallRequest,
     PhoneNumber,
     PhoneNumberConfirmation,
     PhoneNumberList,
     PhoneNumberRequest,
-    ScorecardResponse,
+    PhoneReadiness,
     SeparatedClip,
     SpeechModelsResponse,
     SpeechRequest,
     TextRequest,
     UsageBreakdownResponse,
     UsageHistoryResponse,
+    VoiceDesignRequest,
+    VoiceDesignResponse,
     VoiceIsolation,
     VoiceIsolationRequest,
     VoiceResponse,
@@ -54,17 +56,26 @@ import type {
  */
 export type SendableBody<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
 
+/** The body `configurePhoneAdmission` takes. */
+export type ConfigurePhoneAdmissionBody = PhoneAdmissionConfiguration;
+
 /** The body `confirmPhoneNumber` takes. */
 export type ConfirmPhoneNumberBody = PhoneNumberConfirmation;
 
 /** The body `createPhoneCall` takes. */
-export type CreatePhoneCallBody = PhoneCallRequest;
+export type CreatePhoneCallBody = SendableBody<PhoneCallRequest, "max_duration_seconds" | "record_audio" | "train" | "answering_machine_detection" | "allow_opt_out">;
 
 /** The body `createRealtimeClientSecret` takes. */
 export type CreateRealtimeClientSecretBody = ClientSecretRequest;
 
 /** The body `createSpeech` takes. */
-export type CreateSpeechBody = SendableBody<SpeechRequest, "response_format" | "speed" | "stream_format" | "normalize_text">;
+export type CreateSpeechBody = SendableBody<SpeechRequest, "response_format" | "speed" | "stream_format" | "normalize_text" | "store">;
+
+/** The body `designVoice` takes. */
+export type DesignVoiceBody = VoiceDesignRequest;
+
+/** The body `keepDesignedVoice` takes. */
+export type KeepDesignedVoiceBody = SendableBody<KeepDesignedVoiceRequest, "category">;
 
 /** The body `publishPhoneListener` takes. */
 export type PublishPhoneListenerBody = ListenerBrief;
@@ -74,9 +85,6 @@ export type SendTextBody = TextRequest;
 
 /** The body `setVoiceIsolation` takes. */
 export type SetVoiceIsolationBody = VoiceIsolationRequest;
-
-/** The body `updateFailure` takes. */
-export type UpdateFailureBody = InteractionFailureUpdate;
 
 /** The body `updateVoice` takes. */
 export type UpdateVoiceBody = VoiceUpdateRequest;
@@ -101,9 +109,19 @@ export abstract class _GeneratedClient {
         return this.request("DELETE", `/user/api-keys/${apiKeyId}`);
     }
 
+    /** Cancel a durable call and fence a delayed dial with the same request ID. */
+    async cancelPhoneCall(callId: string): Promise<PhoneCall> {
+        return this.request<PhoneCall>("DELETE", `/phone/calls/${callId}`);
+    }
+
     /** Chat completions. `body` is an OpenAI chat-completions request and is forwarded verbatim; the parsed completion is returned. Streaming (`stream: true`) is not supported by this method — use an OpenAI client for that. */
     async chatCompletions(opts: { body: Record<string, unknown> }): Promise<unknown> {
         return this.request("POST", "/chat/completions", { json: opts.body });
+    }
+
+    /** Configure a signed admission callback for an owned, active inbound number. */
+    async configurePhoneAdmission(opts: { body: PhoneAdmissionConfiguration }): Promise<PhoneAdmissionStatus> {
+        return this.request<PhoneAdmissionStatus>("PUT", "/phone/inbound-admission", { json: opts.body });
     }
 
     /** Enter the code sent to the number; it is confirmed for Nur's calls and texts. */
@@ -112,7 +130,7 @@ export abstract class _GeneratedClient {
     }
 
     /** Have Nur call a phone number: say what the call is about, and Nur has the conversation. Fetch the call afterwards for its transcript. */
-    async createPhoneCall(opts: { body: PhoneCallRequest }): Promise<unknown> {
+    async createPhoneCall(opts: { body: SendableBody<PhoneCallRequest, "max_duration_seconds" | "record_audio" | "train" | "answering_machine_detection" | "allow_opt_out"> }): Promise<unknown> {
         return this.request("POST", "/phone/calls", { json: opts.body });
     }
 
@@ -122,12 +140,12 @@ export abstract class _GeneratedClient {
     }
 
     /** Create speech. */
-    async createSpeech(opts: { body: SendableBody<SpeechRequest, "response_format" | "speed" | "stream_format" | "normalize_text"> }): Promise<Uint8Array> {
+    async createSpeech(opts: { body: SendableBody<SpeechRequest, "response_format" | "speed" | "stream_format" | "normalize_text" | "store"> }): Promise<Uint8Array> {
         return this.request<Uint8Array>("POST", "/audio/speech", { json: opts.body, raw: true });
     }
 
     /** Create transcription. */
-    async createTranscription(opts: { file: Blob; model: string; language?: string; prompt?: string; responseFormat?: "json" | "text" | "verbose_json" | "srt" | "vtt"; temperature?: number; timestampGranularities?: ("word" | "segment")[]; stream?: boolean }): Promise<unknown> {
+    async createTranscription(opts: { file: Blob; model: string; language?: string; prompt?: string; responseFormat?: "json" | "text" | "verbose_json" | "srt" | "vtt"; temperature?: number; timestampGranularities?: ("word" | "segment")[]; stream?: boolean; store?: boolean }): Promise<unknown> {
         const form = new FormData();
         form.append("file", opts.file);
         form.append("model", String(opts.model));
@@ -137,11 +155,12 @@ export abstract class _GeneratedClient {
         if (opts.temperature !== undefined) form.append("temperature", String(opts.temperature));
         if (opts.timestampGranularities !== undefined) for (const v of opts.timestampGranularities) form.append("timestamp_granularities[]", String(v));
         if (opts.stream !== undefined) form.append("stream", String(opts.stream));
+        if (opts.store !== undefined) form.append("store", String(opts.store));
         return this.request("POST", "/audio/transcriptions", { form });
     }
 
     /** Clone a voice from 3-10 seconds of reference audio. */
-    async createVoice(opts: { file: Blob; name: string; consentAttested?: boolean; refText?: string; engine?: "nur-tts-v1" | "omnivoice"; category?: "general" | "conversational" | "narrative" | "podcast" | "customer-service" | "corporate" | "advertising" | "characters"; description?: string; language?: string; gender?: "female" | "male" | "neutral"; accent?: string; preferIsolated?: boolean }): Promise<VoiceResponse> {
+    async createVoice(opts: { file: Blob; name: string; consentAttested?: boolean; refText?: string; engine?: "nur-v1"; category?: "general" | "conversational" | "narrative" | "podcast" | "customer-service" | "corporate" | "advertising" | "characters"; description?: string; language?: string; gender?: "female" | "male" | "neutral"; accent?: string; preferIsolated?: boolean }): Promise<VoiceResponse> {
         const form = new FormData();
         form.append("file", opts.file);
         form.append("name", String(opts.name));
@@ -160,6 +179,11 @@ export abstract class _GeneratedClient {
     /** Delete a cloned voice. */
     async deleteVoice(voiceId: string): Promise<VoiceResponse> {
         return this.request<VoiceResponse>("DELETE", `/voices/${voiceId}`);
+    }
+
+    /** Three takes of a voice described in words, to keep one. */
+    async designVoice(opts: { body: VoiceDesignRequest }): Promise<VoiceDesignResponse> {
+        return this.request<VoiceDesignResponse>("POST", "/voices/design", { json: opts.body });
     }
 
     /** Stop Nur's calls to a number on the shared line until it is confirmed again. */
@@ -195,19 +219,6 @@ export abstract class _GeneratedClient {
             ...(opts.days !== undefined ? { "days": opts.days } : {}),
         };
         return this.request<DailyUsageBreakdownResponse>("GET", "/organizations/usage/daily-breakdown", { params });
-    }
-
-    /** One interaction failure. */
-    async getFailure(failureId: string): Promise<InteractionFailure> {
-        return this.request<InteractionFailure>("GET", `/failures/${failureId}`);
-    }
-
-    /** Per runtime bundle: sessions, how they ended, evidence coverage, reply latency and failures — the scorecard a release is judged by. */
-    async getFailureScorecard(opts: { days?: number } = {}): Promise<ScorecardResponse> {
-        const params: Record<string, unknown> = {
-            ...(opts.days !== undefined ? { "days": opts.days } : {}),
-        };
-        return this.request<ScorecardResponse>("GET", "/failures/scorecard", { params });
     }
 
     /** Organization-wide per-turn latency summary over an optional day window. */
@@ -252,17 +263,9 @@ export abstract class _GeneratedClient {
         return this.request<VoiceIsolation>("GET", `/voices/${voiceId}/isolation`);
     }
 
-    /** Interaction failures raised from this organization's sessions, ranked by severity × confidence. */
-    async listFailures(opts: { status?: string; signal?: string; severity?: string; sessionId?: string; limit?: number; offset?: number } = {}): Promise<InteractionFailureList> {
-        const params: Record<string, unknown> = {
-            ...(opts.status !== undefined ? { "status": opts.status } : {}),
-            ...(opts.signal !== undefined ? { "signal": opts.signal } : {}),
-            ...(opts.severity !== undefined ? { "severity": opts.severity } : {}),
-            ...(opts.sessionId !== undefined ? { "session_id": opts.sessionId } : {}),
-            ...(opts.limit !== undefined ? { "limit": opts.limit } : {}),
-            ...(opts.offset !== undefined ? { "offset": opts.offset } : {}),
-        };
-        return this.request<InteractionFailureList>("GET", "/failures", { params });
+    /** Make one take of a designed voice a voice of your own. */
+    async keepDesignedVoice(opts: { body: SendableBody<KeepDesignedVoiceRequest, "category"> }): Promise<VoiceResponse> {
+        return this.request<VoiceResponse>("POST", "/voices/design/keep", { json: opts.body });
     }
 
     /** List past text-to-speech generations. */
@@ -299,6 +302,11 @@ export abstract class _GeneratedClient {
         return this.request<ListenerEvents>("GET", "/phone/listener/events", { params });
     }
 
+    /** Check the organization's configured phone capabilities without placing a call. */
+    async phoneReadiness(): Promise<PhoneReadiness> {
+        return this.request<PhoneReadiness>("GET", "/phone/readiness");
+    }
+
     /** Brief the code line: what a call about your code should know. Publish again before it expires; calls to the code line use the latest. */
     async publishPhoneListener(opts: { body: ListenerBrief }): Promise<ListenerState> {
         return this.request<ListenerState>("PUT", "/phone/listener", { json: opts.body });
@@ -319,11 +327,6 @@ export abstract class _GeneratedClient {
     /** Speak from the recording, or from the voice isolated out of it. */
     async setVoiceIsolation(voiceId: string, opts: { body: VoiceIsolationRequest }): Promise<VoiceResponse> {
         return this.request<VoiceResponse>("POST", `/voices/${voiceId}/isolation`, { json: opts.body });
-    }
-
-    /** Move a failure through triage (status) and record what was found (notes). */
-    async updateFailure(failureId: string, opts: { body: InteractionFailureUpdate }): Promise<InteractionFailure> {
-        return this.request<InteractionFailure>("PATCH", `/failures/${failureId}`, { json: opts.body });
     }
 
     /** Rename a cloned voice. */

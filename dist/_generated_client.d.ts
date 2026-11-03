@@ -1,4 +1,4 @@
-import type { ApiKeyResponse, BillingCreditsResponse, ClientSecretRequest, ClientSecretResponse, CurrentUsageResponse, DailyUsageBreakdownResponse, GenerationListResponse, InteractionFailure, InteractionFailureList, InteractionFailureUpdate, ListenerBrief, ListenerEvents, ListenerState, OrganizationTurnMetricsSummaryResponse, PhoneCall, PhoneCallRequest, PhoneNumber, PhoneNumberConfirmation, PhoneNumberList, PhoneNumberRequest, ScorecardResponse, SeparatedClip, SpeechModelsResponse, SpeechRequest, TextRequest, UsageBreakdownResponse, UsageHistoryResponse, VoiceIsolation, VoiceIsolationRequest, VoiceResponse, VoiceUpdateRequest, VoicesListResponse } from "./_generated_models.js";
+import type { ApiKeyResponse, BillingCreditsResponse, ClientSecretRequest, ClientSecretResponse, CurrentUsageResponse, DailyUsageBreakdownResponse, GenerationListResponse, KeepDesignedVoiceRequest, ListenerBrief, ListenerEvents, ListenerState, OrganizationTurnMetricsSummaryResponse, PhoneAdmissionConfiguration, PhoneAdmissionStatus, PhoneCall, PhoneCallRequest, PhoneNumber, PhoneNumberConfirmation, PhoneNumberList, PhoneNumberRequest, PhoneReadiness, SeparatedClip, SpeechModelsResponse, SpeechRequest, TextRequest, UsageBreakdownResponse, UsageHistoryResponse, VoiceDesignRequest, VoiceDesignResponse, VoiceIsolation, VoiceIsolationRequest, VoiceResponse, VoiceUpdateRequest, VoicesListResponse } from "./_generated_models.js";
 /**
  * A request body as you send it, rather than as it comes back.
  *
@@ -8,22 +8,26 @@ import type { ApiKeyResponse, BillingCreditsResponse, ClientSecretRequest, Clien
  * server default to get a body past the compiler, so `K` is optional here.
  */
 export type SendableBody<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
+/** The body `configurePhoneAdmission` takes. */
+export type ConfigurePhoneAdmissionBody = PhoneAdmissionConfiguration;
 /** The body `confirmPhoneNumber` takes. */
 export type ConfirmPhoneNumberBody = PhoneNumberConfirmation;
 /** The body `createPhoneCall` takes. */
-export type CreatePhoneCallBody = PhoneCallRequest;
+export type CreatePhoneCallBody = SendableBody<PhoneCallRequest, "max_duration_seconds" | "record_audio" | "train" | "answering_machine_detection" | "allow_opt_out">;
 /** The body `createRealtimeClientSecret` takes. */
 export type CreateRealtimeClientSecretBody = ClientSecretRequest;
 /** The body `createSpeech` takes. */
-export type CreateSpeechBody = SendableBody<SpeechRequest, "response_format" | "speed" | "stream_format" | "normalize_text">;
+export type CreateSpeechBody = SendableBody<SpeechRequest, "response_format" | "speed" | "stream_format" | "normalize_text" | "store">;
+/** The body `designVoice` takes. */
+export type DesignVoiceBody = VoiceDesignRequest;
+/** The body `keepDesignedVoice` takes. */
+export type KeepDesignedVoiceBody = SendableBody<KeepDesignedVoiceRequest, "category">;
 /** The body `publishPhoneListener` takes. */
 export type PublishPhoneListenerBody = ListenerBrief;
 /** The body `sendText` takes. */
 export type SendTextBody = TextRequest;
 /** The body `setVoiceIsolation` takes. */
 export type SetVoiceIsolationBody = VoiceIsolationRequest;
-/** The body `updateFailure` takes. */
-export type UpdateFailureBody = InteractionFailureUpdate;
 /** The body `updateVoice` takes. */
 export type UpdateVoiceBody = VoiceUpdateRequest;
 /** The body `verifyPhoneNumber` takes. */
@@ -37,17 +41,23 @@ export declare abstract class _GeneratedClient {
     }): Promise<T>;
     /** Archive an API key (soft delete). */
     archiveApiKey(apiKeyId: number): Promise<unknown>;
+    /** Cancel a durable call and fence a delayed dial with the same request ID. */
+    cancelPhoneCall(callId: string): Promise<PhoneCall>;
     /** Chat completions. `body` is an OpenAI chat-completions request and is forwarded verbatim; the parsed completion is returned. Streaming (`stream: true`) is not supported by this method — use an OpenAI client for that. */
     chatCompletions(opts: {
         body: Record<string, unknown>;
     }): Promise<unknown>;
+    /** Configure a signed admission callback for an owned, active inbound number. */
+    configurePhoneAdmission(opts: {
+        body: PhoneAdmissionConfiguration;
+    }): Promise<PhoneAdmissionStatus>;
     /** Enter the code sent to the number; it is confirmed for Nur's calls and texts. */
     confirmPhoneNumber(opts: {
         body: PhoneNumberConfirmation;
     }): Promise<PhoneNumber>;
     /** Have Nur call a phone number: say what the call is about, and Nur has the conversation. Fetch the call afterwards for its transcript. */
     createPhoneCall(opts: {
-        body: PhoneCallRequest;
+        body: SendableBody<PhoneCallRequest, "max_duration_seconds" | "record_audio" | "train" | "answering_machine_detection" | "allow_opt_out">;
     }): Promise<unknown>;
     /** Mint a one-use credential that opens a realtime session already configured as you specify, for a client that must not hold your key. */
     createRealtimeClientSecret(opts: {
@@ -55,7 +65,7 @@ export declare abstract class _GeneratedClient {
     }): Promise<ClientSecretResponse>;
     /** Create speech. */
     createSpeech(opts: {
-        body: SendableBody<SpeechRequest, "response_format" | "speed" | "stream_format" | "normalize_text">;
+        body: SendableBody<SpeechRequest, "response_format" | "speed" | "stream_format" | "normalize_text" | "store">;
     }): Promise<Uint8Array>;
     /** Create transcription. */
     createTranscription(opts: {
@@ -67,6 +77,7 @@ export declare abstract class _GeneratedClient {
         temperature?: number;
         timestampGranularities?: ("word" | "segment")[];
         stream?: boolean;
+        store?: boolean;
     }): Promise<unknown>;
     /** Clone a voice from 3-10 seconds of reference audio. */
     createVoice(opts: {
@@ -74,7 +85,7 @@ export declare abstract class _GeneratedClient {
         name: string;
         consentAttested?: boolean;
         refText?: string;
-        engine?: "nur-tts-v1" | "omnivoice";
+        engine?: "nur-v1";
         category?: "general" | "conversational" | "narrative" | "podcast" | "customer-service" | "corporate" | "advertising" | "characters";
         description?: string;
         language?: string;
@@ -84,6 +95,10 @@ export declare abstract class _GeneratedClient {
     }): Promise<VoiceResponse>;
     /** Delete a cloned voice. */
     deleteVoice(voiceId: string): Promise<VoiceResponse>;
+    /** Three takes of a voice described in words, to keep one. */
+    designVoice(opts: {
+        body: VoiceDesignRequest;
+    }): Promise<VoiceDesignResponse>;
     /** Stop Nur's calls to a number on the shared line until it is confirmed again. */
     forgetPhoneNumber(number: string): Promise<unknown>;
     /** Get all API keys for the user's selected organization. */
@@ -101,12 +116,6 @@ export declare abstract class _GeneratedClient {
     getDailyUsageBreakdown(opts?: {
         days?: number;
     }): Promise<DailyUsageBreakdownResponse>;
-    /** One interaction failure. */
-    getFailure(failureId: string): Promise<InteractionFailure>;
-    /** Per runtime bundle: sessions, how they ended, evidence coverage, reply latency and failures — the scorecard a release is judged by. */
-    getFailureScorecard(opts?: {
-        days?: number;
-    }): Promise<ScorecardResponse>;
     /** Organization-wide per-turn latency summary over an optional day window. */
     getOrganizationTurnMetricsSummary(opts?: {
         days?: number;
@@ -128,15 +137,10 @@ export declare abstract class _GeneratedClient {
     getVoice(voiceId: string): Promise<VoiceResponse>;
     /** The recording and the voice separated out of it, to compare. */
     getVoiceIsolation(voiceId: string): Promise<VoiceIsolation>;
-    /** Interaction failures raised from this organization's sessions, ranked by severity × confidence. */
-    listFailures(opts?: {
-        status?: string;
-        signal?: string;
-        severity?: string;
-        sessionId?: string;
-        limit?: number;
-        offset?: number;
-    }): Promise<InteractionFailureList>;
+    /** Make one take of a designed voice a voice of your own. */
+    keepDesignedVoice(opts: {
+        body: SendableBody<KeepDesignedVoiceRequest, "category">;
+    }): Promise<VoiceResponse>;
     /** List past text-to-speech generations. */
     listGenerations(opts?: {
         limit?: number;
@@ -154,6 +158,8 @@ export declare abstract class _GeneratedClient {
     phoneListenerEvents(opts?: {
         wait?: number;
     }): Promise<ListenerEvents>;
+    /** Check the organization's configured phone capabilities without placing a call. */
+    phoneReadiness(): Promise<PhoneReadiness>;
     /** Brief the code line: what a call about your code should know. Publish again before it expires; calls to the code line use the latest. */
     publishPhoneListener(opts: {
         body: ListenerBrief;
@@ -170,10 +176,6 @@ export declare abstract class _GeneratedClient {
     setVoiceIsolation(voiceId: string, opts: {
         body: VoiceIsolationRequest;
     }): Promise<VoiceResponse>;
-    /** Move a failure through triage (status) and record what was found (notes). */
-    updateFailure(failureId: string, opts: {
-        body: InteractionFailureUpdate;
-    }): Promise<InteractionFailure>;
     /** Rename a cloned voice. */
     updateVoice(voiceId: string, opts: {
         body: VoiceUpdateRequest;

@@ -3,7 +3,7 @@
 // - One session per player (separate machines): with `party: true` the
 //   character keeps a party log of who said what to whom, shared by its
 //   sessions as the `party` block, so its story stays straight.
-// - One conversation, several people: Nur Live tags each line `Speaker N:`
+// - One conversation, several people: Nur tags each line `Speaker N:`
 //   once it has heard a second voice; name the `players` and a roster binds
 //   those numbers to them. A `Room` binds them by who was loudest instead.
 
@@ -71,6 +71,7 @@ export interface AttributedTurn {
     speaker: number | null;
     /** The player's name, when known. */
     player: string | null;
+    unattributed?: true;
 }
 
 const INTRODUCTION = /\b(?:i['’]?m|i am|my name(?:['’]s| is)|this is|it['’]?s|call me)\s+([\p{L}'’-]{2,})/giu;
@@ -119,7 +120,8 @@ export class SpeakerRoster {
     }
 
     attribute(transcript: string): AttributedTurn[] {
-        return splitSpeakerTurns(transcript).map(({ speaker, text }) => {
+        return splitSpeakerTurns(transcript).map(({ speaker, text, unattributed }) => {
+            if (unattributed) return { text, speaker: null, player: null, unattributed: true };
             const hello = this.named(text, INTRODUCTION);
             if (hello && speaker === null && !this.helloOrder.includes(hello)) this.helloOrder.push(hello);
             if (speaker !== null) {

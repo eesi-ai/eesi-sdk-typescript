@@ -17,6 +17,7 @@ import { byteLength, MAX_INSTRUCTIONS_BYTES, OUTPUT_SAMPLE_RATE } from "./protoc
 import { Room } from "./room.js";
 import { Session } from "./session.js";
 import { ToolRunner } from "./tools.js";
+import { checkMcpServers, toolPatch } from "./mcp.js";
 const VERBOSITY = {
     brief: "This is a live spoken conversation: answer in one or two short sentences unless asked for more.",
     normal: "This is a live spoken conversation: answer in a few natural sentences, longer only when it helps.",
@@ -78,6 +79,8 @@ export class Character {
     metadata;
     proactive;
     tools;
+    /** Remote MCP servers EESI connects to and runs for this character. */
+    mcpServers;
     triggers = [];
     /** The character's shared live state: its `world` block, in every session. */
     context = new LiveContext("world");
@@ -132,6 +135,7 @@ export class Character {
         const proactive = options.proactive ?? defaults.proactive;
         this.proactive = proactive === true ? {} : proactive && typeof proactive === "object" ? proactive : null;
         this.tools = [...(options.tools ?? [])];
+        this.mcpServers = checkMcpServers(options.mcpServers ?? []);
         this.party = (options.party ?? defaults.party) ? new PartyLog() : null;
         this.bus = new EventBus(client.logger);
         if (options.context)
@@ -219,8 +223,7 @@ export class Character {
         const config = {
             instructions,
             audio: { output, input: { turn_detection: turnDetection, transcription } },
-            tools: session.toolSpecs,
-            tool_choice: session.toolSpecs.length ? "auto" : "none",
+            ...toolPatch(session.toolSpecs, this.mcpServers),
         };
         if (pinned) {
             const [code, name] = pinned;
@@ -398,6 +401,8 @@ export class Character {
                 }
                 : null,
             tools: this.tools.map((item) => item.name),
+            // By label: a server's address and token are not saved with the character.
+            mcp_servers: this.mcpServers.map((server) => server.label),
             context: this.context.get("world"),
         };
     }
@@ -406,6 +411,7 @@ export class Character {
         const made = new Character(this.client, {
             ...this.options,
             tools: this.tools,
+            mcpServers: this.mcpServers,
             memory: this.memory?.memory,
             context: this.context.get("world"),
             ...changes,
@@ -414,8 +420,8 @@ export class Character {
         return made;
     }
 }
-/** Options from a saved character (`toJSON()`), in either SDK's form. */
-export function characterOptionsFromJSON(data, tools = []) {
+/** Options from a saved character (`toJSON()`), in either SDK's form. Pass its tools and MCP servers again: functions and server tokens are not saved. */
+export function characterOptionsFromJSON(data, tools = [], mcpServers = []) {
     const get = (snake, camel) => (data[snake] ?? data[camel] ?? undefined);
     const voice = data.voice;
     const proactive = data.proactive;
@@ -450,6 +456,7 @@ export function characterOptionsFromJSON(data, tools = []) {
         metadata: get("metadata", "metadata"),
         context: get("context", "context"),
         tools,
+        mcpServers,
         proactive: proactive
             ? {
                 idleAfterMs: proactive.idle_after === null ? null : Number(proactive.idle_after ?? 25) * 1000,

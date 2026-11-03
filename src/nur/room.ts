@@ -7,7 +7,7 @@
 // greet whoever walks up.
 //
 // Who said what comes from the audio itself. The room knows which player was
-// loudest while each turn was spoken, and binds Nur Live's `Speaker N`
+// loudest while each turn was spoken, and binds Nur's `Speaker N`
 // labels to players by that, so it does not depend on people introducing
 // themselves:
 //
@@ -94,8 +94,10 @@ export class Room {
             this.timeline = [];
         });
         this.session.on("transcript.final", (event) => {
-            const named = event.turns.filter((turn) => turn.playerId).map((turn) => this.nameOf(turn.playerId) ?? (turn.playerId as string));
-            if (named.length) this.lastSpeaker = named[named.length - 1] as string;
+            for (const turn of event.turns) {
+                if (turn.unattributed) this.lastSpeaker = null;
+                else if (turn.playerId) this.lastSpeaker = this.nameOf(turn.playerId) ?? turn.playerId;
+            }
             this.session.publisher.setBlock("roster", this.render());
         });
     }
@@ -244,7 +246,8 @@ export class Room {
     private attribute(text: string): AttributedTurn[] {
         const ranking = this.loudest(...this.session.speechWindow);
         const roster = this.session.roster;
-        return splitSpeakerTurns(text).map(({ speaker, text: words }) => {
+        return splitSpeakerTurns(text).map(({ speaker, text: words, unattributed }) => {
+            if (unattributed) return { text: words, speaker: null, player: null, unattributed: true };
             let key: string | null;
             if (speaker === null) {
                 key = ranking[0] ?? null;

@@ -149,7 +149,7 @@ describe("ApiError envelopes", () => {
             jsonResponse(422, {
                 detail: [
                     { loc: ["body", "name"], msg: "Field required", type: "missing" },
-                    { model: "nur-tts-v1", message: "Backend unavailable" },
+                    { model: "nur-v1", message: "Backend unavailable" },
                     "plain string item",
                 ],
             }),
@@ -157,7 +157,7 @@ describe("ApiError envelopes", () => {
         const err = await rejection(c.getVoice("voice_1"));
         assert.ok(err instanceof ApiError);
         assert.equal(err.statusCode, 422);
-        assert.equal(err.message, "Field required\nnur-tts-v1: Backend unavailable\nplain string item");
+        assert.equal(err.message, "Field required\nnur-v1: Backend unavailable\nplain string item");
     });
 
     it("prefers the envelope when a body carries both shapes", () => {
@@ -193,7 +193,7 @@ describe("generated call shapes", () => {
         const c = clientWith(stubFetch);
         const result = await c.createTranscription({
             file: new File([new Uint8Array([82, 73, 70, 70])], "clip.wav", { type: "audio/wav" }),
-            model: "nur-stt-v1",
+            model: "nur-v1",
             timestampGranularities: ["word", "segment"],
             temperature: 0.2,
         });
@@ -206,7 +206,7 @@ describe("generated call shapes", () => {
         assert.ok(file instanceof File);
         assert.equal(file.name, "clip.wav");
         assert.equal(file.type, "audio/wav");
-        assert.equal(captured.body.get("model"), "nur-stt-v1");
+        assert.equal(captured.body.get("model"), "nur-v1");
         assert.equal(captured.body.get("temperature"), "0.2");
         assert.deepEqual(captured.body.getAll("timestamp_granularities[]"), ["word", "segment"]);
         assert.equal(captured.body.has("language"), false);
@@ -220,7 +220,7 @@ describe("generated call shapes", () => {
             return jsonResponse(200, {
                 voice_id: "voice_1",
                 name: "Sarah",
-                engine: "nur-tts-v1",
+                engine: "nur-v1",
                 status: "ready",
                 has_ref_text: false,
                 created_at: "2026-01-01T00:00:00Z",
@@ -245,7 +245,7 @@ describe("generated call shapes", () => {
             return jsonResponse(200, { choices: [] });
         };
         const c = clientWith(stubFetch);
-        const payload = { model: "nur-llm-v1", messages: [{ role: "user", content: "hi" }] };
+        const payload = { model: "nur-v1", messages: [{ role: "user", content: "hi" }] };
         assert.deepEqual(await c.chatCompletions({ body: payload }), { choices: [] });
         assert.equal(captured?.headers.get("content-type"), "application/json");
         assert.equal(captured?.body, JSON.stringify(payload));
@@ -257,7 +257,7 @@ describe("generated call shapes", () => {
             async () => new Response(audio, { status: 200, headers: { "content-type": "audio/mpeg" } }),
         );
         const out = await c.createSpeech({
-            body: { model: "nur-tts-v1", input: "Hello", voice: "ev_1a2b3c4d" },
+            body: { model: "nur-v1", input: "Hello", voice: "ev_1a2b3c4d" },
         });
         assert.ok(out instanceof Uint8Array);
         assert.deepEqual(Array.from(out), Array.from(audio));
@@ -407,7 +407,7 @@ describe("README quickstart", () => {
 
         const voices = await client.listVoices();
         const body: CreateSpeechBody = {
-            model: "nur-tts-v1",
+            model: "nur-v1",
             voice: voices.data[0]!.voice_id,
             input: "Your appointment is confirmed for Thursday at two.",
             response_format: "wav",
@@ -424,7 +424,7 @@ describe("README quickstart", () => {
         );
         // No response_format / speed / stream_format: the server owns those.
         const audio = await client.createSpeech({
-            body: { model: "nur-tts-v1", voice: "ev_1a2b3c4d", input: "Hello" },
+            body: { model: "nur-v1", voice: "ev_1a2b3c4d", input: "Hello" },
         });
         assert.ok(audio instanceof Uint8Array);
     });
