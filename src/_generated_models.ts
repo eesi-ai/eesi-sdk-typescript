@@ -376,7 +376,7 @@ export interface paths {
          * @description Erase a cloned voice: its reference clip first, then its row.
          *
          *     The clip is a recording of a person's voice, so "deleted" has to mean the
-         *     bytes are gone — flipping a flag and leaving the voiceprint in the bucket
+         *     bytes are gone — flipping a flag and leaving the voiceprint in storage
          *     makes the delete button a false promise.
          *
          *     Audio is removed before the row, because the row holds the only pointer to

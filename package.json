@@ -3,7 +3,7 @@
   "version": "0.4.0",
   "description": "EESI for TypeScript: characters you can talk to in real time on Nur (voice, tools, live context, memory, multiplayer), and a typed client for the EESI API",
   "license": "BSD-2-Clause",
-  "author": "Zansat Technologies Private Limited",
+  "author": "EESI Labs Inc.",
   "homepage": "https://docs.eesi.ai/realtime/characters",
   "repository": {
     "type": "git",
